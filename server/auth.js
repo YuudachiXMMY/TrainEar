@@ -17,12 +17,17 @@ function mailMode(){ return process.env.SMTP_HOST ? "smtp" : "console"; }
 function getMailer(){
   if(!mailer){
     const nodemailer = require("nodemailer");
-    mailer = nodemailer.createTransport({
+    const opt = {
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || "587", 10),
       secure: process.env.SMTP_SECURE === "1",
       auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined
-    });
+    };
+    // 内网直连模式（如 docker 网内的 stalwart:25）：跳过 STARTTLS，避免内部主机名和证书域名不匹配
+    if(process.env.SMTP_IGNORE_TLS === "1") opt.ignoreTLS = true;
+    // 或者保留 TLS 但不校验证书（仅限内网可信环境）
+    if(process.env.SMTP_TLS_INSECURE === "1") opt.tls = { rejectUnauthorized: false };
+    mailer = nodemailer.createTransport(opt);
   }
   return mailer;
 }
