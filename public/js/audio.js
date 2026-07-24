@@ -1,6 +1,39 @@
 "use strict";
 /* 音频引擎：Karplus-Strong 电贝斯/电吉他、合成贝斯、EP 键盘、自定义采样、乐句生成 */
 
+/* ---------------- 内置采样电贝斯 ----------------
+   Karoryfer「Black And Blue Basses」(CC0)，dark black 贝斯常规拨奏 mf 层，
+   逐半音真采样 + 双 round robin。文件名 = 实际发声 MIDI（原库标记高一个八度已换算）。
+   MIDI 48 是原库空档，由 47 就近变调补。 */
+const BuiltinBass = {
+  base: "samples/bass/",
+  notes: (()=>{ const a=[]; for(let m=25;m<=54;m++) if(m!==48) a.push(m); return a; })(),
+  rr: 2,
+  buffers: {},   // "midi_rr" -> AudioBuffer | "loading" | "failed"
+  seq: {},       // midi -> 上次用的 rr（轮换让重复音更真实）
+  key(m, r){ return m + "_" + r; },
+  nearest(midi){
+    let best = null, bd = 1e9;
+    for(const n of this.notes){ const d = Math.abs(n - midi); if(d < bd){ bd = d; best = n; } }
+    return best;
+  },
+  async load(root){
+    if(location.protocol === "file:") return;   // 离线模式无法 fetch，走 KS 回退
+    const ctx = AE.ensure();
+    await Promise.all([1,2].map(async r=>{
+      const k = this.key(root, r);
+      if(this.buffers[k]) return;
+      this.buffers[k] = "loading";
+      try{
+        const resp = await fetch(this.base + k + ".mp3");
+        if(!resp.ok) throw new Error(String(resp.status));
+        this.buffers[k] = await ctx.decodeAudioData(await resp.arrayBuffer());
+      }catch(e){ this.buffers[k] = "failed"; }
+    }));
+  },
+  preloadAll(){ this.notes.forEach(n => this.load(n)); }
+};
+
 /* ---------------- 自定义采样音源（同名多条 = 多采样音区，就近变调） ---------------- */
 const Samples = {
   list: [],        // [{id, name, role, rootMidi, url}]
@@ -127,6 +160,30 @@ const AE = {
     src.start(t); src.stop(t+dur+0.06);
   },
 
+  /* --- 音色：采样电贝斯（真实录音，双 RR 轮换）。未加载完成时返回 false 回退 KS --- */
+  smpBass(dest, t, dur, midi, vel){
+    const root = BuiltinBass.nearest(midi);
+    if(root === null) return false;
+    const next = ((BuiltinBass.seq[root] || 0) % BuiltinBass.rr) + 1;
+    let buf = BuiltinBass.buffers[BuiltinBass.key(root, next)];
+    if(!(buf && buf.duration)) buf = BuiltinBass.buffers[BuiltinBass.key(root, next === 1 ? 2 : 1)];
+    if(!(buf && buf.duration)){ BuiltinBass.load(root); return false; }
+    BuiltinBass.seq[root] = next;
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const rate = Math.pow(2, (midi - root) / 12);
+    src.playbackRate.value = rate * (1 + (Math.random()*2 - 1) * 0.0008);
+    const g = this.ctx.createGain();
+    const peak = 0.62 * vel;   // 与建模贝斯响度对齐
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.004);
+    g.gain.setValueAtTime(peak, Math.max(t + 0.004, t + dur - 0.05));
+    g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.06);
+    src.connect(g); g.connect(dest);
+    src.start(t);
+    src.stop(t + Math.min(buf.duration / rate + 0.1, dur + 0.25));
+    return true;
+  },
+
   /* --- 音色：合成贝斯（减法合成，v1 的音色保留为可选项） --- */
   synthBass(dest, t, dur, midi, vel){
     const ctx = this.ctx, f = this.midiHz(midi);
@@ -239,8 +296,9 @@ const AE = {
       end = Math.max(end, ev.t*spb + dur);
       const vel = ev.vel ?? 1;
       if(ev.voice === "bass"){
-        const bv = S.data.settings.bassVoice || "ks-bass";
-        if(bv.startsWith("custom:") && this.sample(this.group, t, dur, ev.midi, vel, bv.slice(7))){}
+        const bv = S.data.settings.bassVoice || "smp-bass";
+        if(bv === "smp-bass" && this.smpBass(this.group, t, dur, ev.midi, vel)){}
+        else if(bv.startsWith("custom:") && this.sample(this.group, t, dur, ev.midi, vel, bv.slice(7))){}
         else if(bv === "synth-bass") this.synthBass(this.group, t, dur, ev.midi, vel);
         else this.bass(this.group, t, dur, ev.midi, vel);
       }else if(ev.voice === "ep"){

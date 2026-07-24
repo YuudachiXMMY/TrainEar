@@ -44,6 +44,8 @@ function makeWav() {
   return buf;
 }
 
+const makeWavBuf = makeWav();
+
 const errors = [];
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
@@ -187,6 +189,79 @@ await step("bad password and duplicate register rejected", async () => {
     (await (await fetch("/api/auth/register", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "jadyn", email: "x@y.io", password: "abcdef" }) })).status));
   if (r2 !== 409) throw new Error("duplicate username not rejected: " + r2);
+});
+
+// ---- 内置采样电贝斯：默认音色、加载、RR 轮换 ----
+await step("builtin sampled bass loads and rotates RR", async () => {
+  await page.evaluate(() => { localStorage.clear(); });
+  await page.reload(); await page.waitForSelector('[data-act="nav-mode"]');
+  const bv = await page.evaluate(() => S.data.settings.bassVoice);
+  if (bv !== "smp-bass") throw new Error("default bassVoice=" + bv);
+  await page.waitForFunction(() =>
+    ["40_1","40_2","47_1","47_2"].every(k => { const b = BuiltinBass.buffers[k]; return b && b.duration; }) &&
+    Object.values(BuiltinBass.buffers).filter(b => b && b.duration).length >= 20,
+    null, { timeout: 30000 });
+  const r = await page.evaluate(() => {
+    AE.ensure();
+    AE.stopAll();
+    AE.group = AE.ctx.createGain(); AE.group.connect(AE.master);
+    const t0 = AE.ctx.currentTime + 0.05;
+    const ok1 = AE.smpBass(AE.group, t0, 0.4, 40, 1);
+    const ok2 = AE.smpBass(AE.group, t0 + 0.5, 0.4, 40, 1);
+    const ok48 = AE.smpBass(AE.group, t0 + 1.0, 0.4, 48, 1); // 库空档，走 47 变调
+    const seq = BuiltinBass.seq[40];
+    AE.stopAll();
+    return { ok1, ok2, ok48, seq };
+  });
+  if (!r.ok1 || !r.ok2 || !r.ok48) throw new Error("smpBass returned false: " + JSON.stringify(r));
+  if (r.seq !== 2) throw new Error("RR did not rotate, seq=" + r.seq);
+});
+
+// ---- 采样与 KS 响度对比（信息性）----
+await step("sampled vs KS loudness sanity", async () => {
+  const r = await page.evaluate(async () => {
+    const buf40 = BuiltinBass.buffers[BuiltinBass.key(40, 1)];
+    const off = new OfflineAudioContext(1, 44100 * 2, 44100);
+    const g = off.createGain(); g.connect(off.destination);
+    const saved = AE.ctx; AE.ctx = off; AE.ksCache = {};
+    AE.bass(g, 0.02, 1.5, 40, 1);
+    const ks = await off.startRendering();
+    AE.ctx = saved; AE.ksCache = {};
+    const rms = d => { let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * d[i]; return Math.sqrt(s / (d.length / 4)); };
+    const smp = buf40.getChannelData(0);
+    return { ks: rms(ks.getChannelData(0)), smp: rms(smp) * 0.62 };
+  });
+  console.log(`    ks rms=${r.ks.toFixed(3)} | smp(×0.62 gain) rms=${r.smp.toFixed(3)}`);
+  if (r.smp < 0.01) throw new Error("sampled bass too quiet");
+});
+
+// ---- 多文件上传：按文件名识别音高 ----
+await step("multi-file upload with filename pitch parsing", async () => {
+  const parse = await page.evaluate(() =>
+    [midiFromFilename("E1.wav"), midiFromFilename("A#1.wav"), midiFromFilename("Db2.flac"), midiFromFilename("nope.wav")]);
+  if (JSON.stringify(parse) !== JSON.stringify([28, 34, 37, null]))
+    throw new Error("midiFromFilename wrong: " + JSON.stringify(parse));
+  // 确保登录（cookie 可能仍有效）
+  const loggedIn = await page.evaluate(() => !!API.user);
+  if (!loggedIn) {
+    await page.click('[data-act="nav-auth"]');
+    await page.fill("#f-account", "jadyn");
+    await page.fill("#f-pass", "bass12345");
+    await page.click('[data-act="auth-login"]');
+    await page.waitForFunction(() => API.user, null, { timeout: 10000 });
+  }
+  await page.evaluate(() => { S.screen = "sources"; render(); });
+  await page.fill("#f-srcname", "GP自制");
+  await page.setInputFiles("#f-srcfile", [
+    { name: "E1.wav", mimeType: "audio/wav", buffer: makeWavBuf },
+    { name: "A1.wav", mimeType: "audio/wav", buffer: makeWavBuf }
+  ]);
+  await page.click('[data-act="src-upload"]');
+  await page.waitForFunction(() => Samples.list.length === 2, null, { timeout: 8000 });
+  const roots = await page.evaluate(() => Samples.list.map(s => s.rootMidi).sort((a, b) => a - b));
+  if (JSON.stringify(roots) !== JSON.stringify([28, 33])) throw new Error("parsed roots wrong: " + roots);
+  // 清理
+  await page.evaluate(async () => { for (const s of [...Samples.list]) await API.deleteSample(s.id); });
 });
 
 console.log(errors.length ? "CONSOLE/PAGE ERRORS:\n" + errors.join("\n") : "NO console/page errors");
