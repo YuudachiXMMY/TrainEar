@@ -48,19 +48,22 @@ function newToken(){ return crypto.randomBytes(32).toString("hex"); }
 function genCode(){ return String(crypto.randomInt(0, 1000000)).padStart(6, "0"); }
 
 /* ---------- 会话 ---------- */
+// SECURE_COOKIES=1 时给会话 cookie 加 Secure（HTTPS 反代部署用）
+function cookieFlags(){
+  return "Path=/; HttpOnly; SameSite=Lax" + (process.env.SECURE_COOKIES === "1" ? "; Secure" : "");
+}
 function createSession(res, userId){
   const token = newToken();
   const expires = Date.now() + SESSION_DAYS * 86400e3;
   db.prepare("INSERT INTO sessions(token, user_id, expires_at) VALUES(?,?,?)").run(token, userId, expires);
-  res.cookie ? null : null;
   res.setHeader("Set-Cookie",
-    `sid=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`);
+    `sid=${token}; ${cookieFlags()}; Max-Age=${SESSION_DAYS * 86400}`);
   return token;
 }
 function clearSession(req, res){
   const sid = readSid(req);
   if(sid) db.prepare("DELETE FROM sessions WHERE token=?").run(sid);
-  res.setHeader("Set-Cookie", "sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+  res.setHeader("Set-Cookie", `sid=; ${cookieFlags()}; Max-Age=0`);
 }
 function readSid(req){
   const c = req.headers.cookie || "";

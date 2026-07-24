@@ -2,6 +2,8 @@
 /* J-Rock 练耳训练器 · 服务端入口
    启动：npm start   （默认 http://localhost:8321）
    环境变量：PORT、DATA_DIR、SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM/SMTP_SECURE
+   反向代理部署（IthacaServer/Traefik）：TRUST_PROXY=1（信任 X-Forwarded-* 取真实 IP）、
+   SECURE_COOKIES=1（会话 cookie 加 Secure 标记，仅 HTTPS 下发）。
    支持根目录 .env 文件（KEY=VALUE 每行一条）。 */
 const fs = require("fs");
 const path = require("path");
@@ -23,8 +25,12 @@ const samples = require("./samples");
 
 const app = express();
 app.disable("x-powered-by");
+if(process.env.TRUST_PROXY === "1") app.set("trust proxy", 1);
 app.use(express.json({ limit: "600kb" }));
 app.use(auth.sessionMiddleware);
+
+// 健康检查（容器 healthcheck 与 Traefik 探活用）
+app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 app.use("/api/auth", auth.router);
 app.use("/api/progress", progress.router);

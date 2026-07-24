@@ -46,6 +46,17 @@ tests/e2e.mjs    端到端测试
 legacy/          拆分前的单文件版本（v3），可独立使用
 ```
 
+## 部署（IthacaServer / trainear.jadynwu.com）
+
+本应用按 IthacaServer v2 的 git-source 单容器模式部署，配置放在 IthacaServer 仓库的 `apps/trainear/`（app.env、docker-compose.yml、config/Dockerfile）。要点：
+
+- 服务端支持两个部署环境变量：`TRUST_PROXY=1`（Traefik 反代后信任 X-Forwarded-*，限速取真实 IP）、`SECURE_COOKIES=1`（会话 cookie 加 Secure，仅 HTTPS 下发）。本地开发不设即可。
+- 健康检查端点 `GET /api/health`，容器 healthcheck 与平台探活共用。
+- SQLite 与上传采样都在 `DATA_DIR`（容器内 `/data`，宿主 `apps/trainear/data/app`），`ops backup` 直接打包，无需独立数据库 dump（`DB_TYPE=""`）。
+- SMTP 留空时验证码打印在容器日志（`ops logs` 查看）；配好 SMTP 环境变量后真实发信。
+
+日常操作（开发者视角）：推代码到 `main` 后 `ssh trainear 'ops deploy'`，然后 `ops status` / `ops logs` 验证；备份 `ops backup`。
+
 ## 自定义音源
 
 音源管理里上传单音采样（wav / mp3 / ogg / flac / m4a，单个不超过 8MB），标注这个音的音名。同一个音源名可以传多个音（建议低中高各一个，比如贝斯空弦 E1 A1 D2 G2），播放时引擎选最近的采样按半音比率变调。上传后在首页或任意答题页把「贝斯」或「和弦」音色切成该采样即可。
