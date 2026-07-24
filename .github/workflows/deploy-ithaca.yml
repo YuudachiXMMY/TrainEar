@@ -1,0 +1,49 @@
+name: Deploy to Ithaca Server
+
+on:
+  push:
+    branches: ["deploy/ithaca"]
+  workflow_dispatch:
+
+concurrency:
+  group: "deploy-ithaca"
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Syntax check
+        run: |
+          for f in server/*.js public/js/*.js; do node --check "$f"; done
+      - name: Boot smoke test (/api/health)
+        run: |
+          DATA_DIR=/tmp/ci-data PORT=8321 node server/index.js &
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8321/api/health; then exit 0; fi
+            sleep 0.5
+          done
+          echo "server did not become healthy" >&2
+          exit 1
+
+  deploy:
+    name: Deploy
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.ITHACA_HOST }}
+          username: app-trainear
+          key: ${{ secrets.ITHACA_SSH_KEY }}
+          port: ${{ secrets.ITHACA_PORT }}
+          script: ops deploy
