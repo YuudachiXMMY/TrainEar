@@ -13,12 +13,21 @@ const store = {
 store.init();
 function defaultData(){
   return {v:1, days:{}, levels:{}, conf:{}, anchors:{},
-          settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", bassVoice:"ks-bass", rootHighOct:false}};
+          settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", bassVoice:"smp-bass", rootHighOct:false}};
 }
 function loadData(){
   try{
     const raw = store.get(DATA_KEY);
-    if(raw){ const d = JSON.parse(raw); return Object.assign(defaultData(), d, {settings:Object.assign(defaultData().settings, d.settings||{})}); }
+    if(raw){
+      const d = JSON.parse(raw);
+      const merged = Object.assign(defaultData(), d, {settings:Object.assign(defaultData().settings, d.settings||{})});
+      // 一次性迁移：把老默认的建模贝斯升级为采样电贝斯（用户之后仍可手动选回）
+      if(!merged.settings.srcMigrated){
+        if(merged.settings.bassVoice === "ks-bass") merged.settings.bassVoice = "smp-bass";
+        merged.settings.srcMigrated = 1;
+      }
+      return merged;
+    }
   }catch(e){}
   return defaultData();
 }
@@ -48,6 +57,10 @@ async function afterLogin(){
   if(pr && pr.data){
     S.data = Object.assign(defaultData(), pr.data,
       {settings: Object.assign(defaultData().settings, pr.data.settings || {})});
+    if(!S.data.settings.srcMigrated){
+      if(S.data.settings.bassVoice === "ks-bass") S.data.settings.bassVoice = "smp-bass";
+      S.data.settings.srcMigrated = 1;
+    }
     try{ store.set(DATA_KEY, JSON.stringify(S.data)); }catch(e){}
     S.syncState = "ok";
   }else if(!pr || !pr.error){
@@ -456,7 +469,7 @@ function renderTopbar(){
 }
 function sourceOptions(kind){
   const opts = kind === "bass"
-    ? [["ks-bass","电贝斯"],["synth-bass","合成贝斯"]]
+    ? [["smp-bass","采样电贝斯（真实录音）"],["ks-bass","建模电贝斯"],["synth-bass","合成贝斯"]]
     : [["gtr","电吉他"],["ep","键盘"]];
   for(const n of Samples.groups(kind)) opts.push(["custom:" + n, "采样 · " + n]);
   return opts;
@@ -723,14 +736,15 @@ function renderSources(){
   for(let m = 28; m <= 64; m++) noteOpts.push('<option value="' + m + '"' + (m === 40 ? ' selected' : '') + '>' + noteNameOct(m) + '</option>');
   const allNames = [...new Set(Samples.list.map(s => s.name))];
   let h = '<div class="card" style="margin-bottom:12px"><h3>上传采样</h3>' +
-    '<div class="sub small" style="margin-bottom:10px">录一个干净的单音（wav / mp3 等），标注它的音名。同一个音源名可以传多个音，播放时就近变调；低中高各录一个，音质就很稳。</div>' +
+    '<div class="sub small" style="margin-bottom:10px">录干净的单音（wav / mp3 等），同一个音源名可以传多个音，播放时就近变调。' +
+    '支持一次选多个文件：按文件名自动识别音高（如 E1.wav、A#1.wav、Db2.wav）；单个文件也可以用右边的下拉手动指定。</div>' +
     '<div class="row" style="gap:10px">' +
     '<input type="text" id="f-srcname" placeholder="音源名（如 我的P-Bass）" list="srcNames" style="flex:1;min-width:150px">' +
     '<datalist id="srcNames">' + allNames.map(n => '<option value="' + esc(n) + '">').join("") + '</datalist>' +
     '<select id="f-srcrole"><option value="any">贝斯和和弦都可用</option><option value="bass">仅作贝斯音色</option><option value="chord">仅作和弦音色</option></select>' +
     '<label class="small muted">这个音是 <select id="f-srcroot">' + noteOpts.join("") + '</select></label>' +
     '</div><div class="row" style="margin-top:10px;gap:10px">' +
-    '<input type="file" id="f-srcfile" accept="audio/*" style="flex:1">' +
+    '<input type="file" id="f-srcfile" accept="audio/*" multiple style="flex:1">' +
     '<button data-act="src-upload">上传</button></div>' +
     (S.srcMsg ? '<div class="small" style="margin-top:8px;color:var(--accent)">' + esc(S.srcMsg) + '</div>' : "") + '</div>';
   if(!allNames.length){
@@ -911,22 +925,44 @@ async function handleAuth(act, btn){
     return;
   }
 }
+// 从文件名解析音高（E1、A#1、Db2、darkblack_e2_x 等），解析不到返回 null
+function midiFromFilename(fn){
+  const m = String(fn).match(/([A-Ga-g])([#b♯♭]?)(-?\d)/);
+  if(!m) return null;
+  const base = {c:0,d:2,e:4,f:5,g:7,a:9,b:11}[m[1].toLowerCase()];
+  const acc = (m[2] === "#" || m[2] === "♯") ? 1 : ((m[2] === "b" || m[2] === "♭") ? -1 : 0);
+  const midi = base + acc + (parseInt(m[3],10) + 1) * 12;
+  return (midi >= 24 && midi <= 84) ? midi : null;
+}
 async function handleSources(act, btn){
   if(act === "src-upload"){
     const fileEl = document.getElementById("f-srcfile");
-    const name = $v("f-srcname"), role = $v("f-srcrole"), root = parseInt($v("f-srcroot"), 10);
+    const name = $v("f-srcname"), role = $v("f-srcrole");
+    const files = [...(fileEl.files || [])];
     if(!name){ S.srcMsg = "先给音源起个名字"; render(); return; }
-    if(!fileEl.files[0]){ S.srcMsg = "先选择一个音频文件"; render(); return; }
-    const fd = new FormData();
-    fd.append("name", name); fd.append("role", role); fd.append("rootMidi", root);
-    fd.append("file", fileEl.files[0]);
-    S.srcMsg = "上传中…"; render();
-    const r = await API.uploadSample(fd);
-    if(r.ok){
-      const ls = await API.listSamples();
-      if(ls.samples) Samples.setList(ls.samples);
-      S.srcMsg = "已上传：" + name + " · " + noteNameOct(root);
-    }else S.srcMsg = r.error || "上传失败";
+    if(!files.length){ S.srcMsg = "先选择音频文件"; render(); return; }
+    // 单文件：文件名识别不到就用下拉指定；多文件：必须都能从文件名识别
+    const jobs = [];
+    for(const f of files){
+      let midi = midiFromFilename(f.name);
+      if(midi === null && files.length === 1) midi = parseInt($v("f-srcroot"), 10);
+      if(midi === null){ S.srcMsg = "无法从文件名识别音高：" + f.name + "（改名成 E1.wav 这类，或一次只传一个并用下拉指定）"; render(); return; }
+      jobs.push({ f, midi });
+    }
+    let done = 0, fail = "";
+    for(const j of jobs){
+      S.srcMsg = "上传中 " + (done+1) + "/" + jobs.length + "：" + j.f.name; render();
+      const fd = new FormData();
+      fd.append("name", name); fd.append("role", role); fd.append("rootMidi", j.midi);
+      fd.append("file", j.f);
+      const r = await API.uploadSample(fd);
+      if(r.ok) done++;
+      else { fail = r.error || "上传失败"; break; }
+    }
+    const ls = await API.listSamples();
+    if(ls.samples) Samples.setList(ls.samples);
+    S.srcMsg = fail ? ("已上传 " + done + "/" + jobs.length + "，中断于：" + fail)
+                    : ("已上传 " + done + " 个采样到「" + name + "」");
     render(); return;
   }
   if(act === "src-prev"){
@@ -958,7 +994,10 @@ document.addEventListener("change", e=>{
     case "random": st.random = el.checked; break;
     case "bpm": st.bpm = parseInt(el.value,10); break;
     case "cvoice": st.chordVoice = el.value; if(el.value.startsWith("custom:")) Samples.preload(el.value.slice(7)); break;
-    case "bvoice": st.bassVoice = el.value; if(el.value.startsWith("custom:")) Samples.preload(el.value.slice(7)); break;
+    case "bvoice": st.bassVoice = el.value;
+      if(el.value.startsWith("custom:")) Samples.preload(el.value.slice(7));
+      if(el.value === "smp-bass") BuiltinBass.preloadAll();
+      break;
     case "hioct": st.rootHighOct = el.checked; break;
     case "vol": st.vol = parseFloat(el.value); AE.setVol(st.vol); break;
     case "anchor": S.data.anchors[el.dataset.id] = el.value.trim(); break;
@@ -980,11 +1019,14 @@ document.addEventListener("keydown", e=>{
 render();
 (async function init(){
   if(API.offline) return;
+  // 先完成登录态与云端数据（避免采样预载占满连接池拖慢认证请求）
   const r = await API.me();
   if(r && r.user){
     API.user = r.user;
     await afterLogin();
     if(!S.syncState) S.syncState = "ok";
   }
-  render();
+  // 补渲染只在用户还停在首页时做，避免覆盖正在操作的界面（如登录表单）
+  if(S.screen === "home") render();
+  if((S.data.settings.bassVoice || "smp-bass") === "smp-bass") BuiltinBass.preloadAll();
 })();
