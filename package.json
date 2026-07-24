@@ -1,0 +1,19 @@
+{
+  "name": "jrock-ear-trainer",
+  "version": "1.0.0",
+  "description": "J-Rock 练耳训练器：bass 手专用的分阶段听力训练（根音追踪 / 性质听辨 / 套路识别），带账号、云同步与自定义音源",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node tests/e2e.mjs"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.2",
+    "nodemailer": "^6.10.1"
+  }
+}

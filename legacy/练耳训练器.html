@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>J-Rock 练耳训练器 · Bass 手专用</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --page:#0d0d0d;
+    --surface:#1a1a19;
+    --surface-2:#232322;
+    --ink:#ffffff;
+    --ink-2:#c3c2b7;
+    --ink-3:#898781;
+    --hairline:rgba(255,255,255,0.10);
+    --grid:#2c2c2a;
+    --accent:#3987e5;          /* 阶段1 根音 */
+    --accent-quality:#199e70;  /* 阶段2 性质 */
+    --accent-pattern:#9085e9;  /* 阶段3 套路 */
+    --accent-warm:#c98500;     /* 阶段0 热身 */
+    --good:#0ca30c;
+    --warn:#fab219;
+    --bad:#d03b3b;
+    --radius:14px;
+    --maxw:780px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--page);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+    font-size:16px;line-height:1.55;}
+  #app{max-width:var(--maxw);margin:0 auto;padding:18px 16px 90px;}
+
+  /* ---------- 通用 ---------- */
+  .card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:16px;}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .grow{flex:1;}
+  .muted{color:var(--ink-3);}
+  .sub{color:var(--ink-2);}
+  .small{font-size:13px;}
+  .tiny{font-size:12px;}
+  h1{font-size:22px;margin:0;}
+  h2{font-size:18px;margin:0 0 6px;}
+  h3{font-size:15px;margin:0 0 4px;}
+  button{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--hairline);
+    border-radius:10px;padding:9px 14px;cursor:pointer;transition:transform .06s ease, background .15s ease, border-color .15s ease;}
+  button:hover{background:#2a2a28;}
+  button:active{transform:scale(.97);}
+  button:disabled{opacity:.45;cursor:default;transform:none;}
+  select,input[type=text],textarea{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--hairline);border-radius:10px;padding:8px 10px;}
+  input[type=range]{accent-color:var(--accent);}
+  textarea{width:100%;min-height:110px;resize:vertical;font-size:12px;font-family:"SF Mono",Menlo,monospace;}
+  a{color:var(--accent);}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .topbar .title-wrap{flex:1;min-width:0;}
+  .topbar .subtitle{font-size:12.5px;color:var(--ink-3);margin-top:2px;}
+  .pill{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--hairline);
+    border-radius:999px;padding:5px 12px;font-size:13px;color:var(--ink-2);white-space:nowrap;}
+  .pill b{color:var(--ink);font-weight:600;}
+  .backbtn{border:none;background:none;color:var(--ink-2);font-size:15px;padding:6px 8px;border-radius:8px;}
+  .backbtn:hover{background:var(--surface);}
+
+  /* ---------- 首页模式卡 ---------- */
+  .mode-card{display:block;width:100%;text-align:left;padding:16px;margin-bottom:12px;
+    background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);}
+  .mode-card:hover{background:#1f1f1e;border-color:rgba(255,255,255,.18);}
+  .mode-card .mode-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+  .stage-tag{font-size:11.5px;font-weight:600;letter-spacing:.04em;padding:2px 8px;border-radius:6px;
+    color:var(--ink);background:var(--surface-2);border:1px solid var(--hairline);}
+  .stage-tag::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;
+    background:var(--tag-c,var(--accent));vertical-align:1px;}
+  .mode-card .desc{color:var(--ink-2);font-size:13.5px;}
+  .mode-card .lv-dots{display:flex;gap:6px;margin-top:10px;}
+  .lv-dot{font-size:11.5px;color:var(--ink-3);border:1px solid var(--hairline);border-radius:6px;padding:2px 8px;}
+  .lv-dot.passed{color:var(--good);border-color:rgba(12,163,12,.4);}
+
+  /* ---------- 档位选择 ---------- */
+  .level-btn{display:block;width:100%;text-align:left;padding:14px 16px;margin-bottom:10px;
+    background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);}
+  .level-btn:hover{background:#1f1f1e;}
+  .level-btn .lv-name{font-weight:600;}
+  .level-btn .lv-goal{font-size:12.5px;color:var(--ink-3);margin-top:2px;}
+  .level-btn .meter-wrap{margin-top:8px;}
+  .badge-pass{display:inline-block;font-size:11px;font-weight:600;color:var(--good);
+    border:1px solid rgba(12,163,12,.45);border-radius:6px;padding:1px 7px;margin-left:8px;vertical-align:1px;}
+  .badge-rec{display:inline-block;font-size:11px;font-weight:600;color:var(--accent);
+    border:1px solid rgba(57,135,229,.5);border-radius:6px;padding:1px 7px;margin-left:8px;vertical-align:1px;}
+
+  /* ---------- 进度条 meter ---------- */
+  .meter{height:6px;border-radius:3px;background:rgba(57,135,229,.16);overflow:hidden;}
+  .meter>i{display:block;height:100%;border-radius:3px;background:var(--accent);width:0;}
+  .meter.q>i{background:var(--accent-quality);} .meter.q{background:rgba(25,158,112,.16);}
+  .meter.p>i{background:var(--accent-pattern);} .meter.p{background:rgba(144,133,233,.16);}
+  .meter-label{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3);margin-bottom:3px;}
+
+  /* ---------- 答题界面 ---------- */
+  .quiz-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .quiz-stats{display:flex;gap:14px;font-size:12.5px;color:var(--ink-3);margin-left:auto;white-space:nowrap;}
+  .quiz-stats b{color:var(--ink-2);font-weight:600;}
+  .playzone{display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 16px 18px;
+    background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);margin-bottom:14px;}
+  .bigplay{width:88px;height:88px;border-radius:50%;border:1px solid var(--hairline);
+    background:radial-gradient(circle at 35% 30%, #2c2c2a, var(--surface-2));
+    display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--ink);}
+  .bigplay:hover{border-color:var(--mode-c,var(--accent));}
+  .bigplay.playing{animation:pulse 1.1s ease-in-out infinite;border-color:var(--mode-c,var(--accent));}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.0);}50%{box-shadow:0 0 0 9px rgba(255,255,255,.05);}}
+  .play-caption{font-size:13px;color:var(--ink-2);min-height:20px;text-align:center;}
+  .beat-dots{display:flex;gap:7px;min-height:10px;}
+  .beat-dot{width:9px;height:9px;border-radius:50%;background:var(--grid);}
+  .beat-dot.on{background:var(--mode-c,var(--accent));}
+  .replay-row{display:flex;gap:8px;}
+  .replay-row button{font-size:13px;padding:7px 12px;}
+
+  .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .opts.narrow{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));}
+  .opt{padding:14px 10px;text-align:center;font-size:17px;font-weight:600;border-radius:12px;position:relative;}
+  .opt .key-hint{position:absolute;top:5px;left:8px;font-size:10.5px;color:var(--ink-3);font-weight:400;}
+  .opt .opt-sub{display:block;font-size:11.5px;color:var(--ink-3);font-weight:400;margin-top:3px;}
+  .opt.correct{border-color:var(--good);background:rgba(12,163,12,.12);}
+  .opt.wrong{border-color:var(--bad);background:rgba(208,59,59,.12);}
+  .opt.dim{opacity:.45;}
+
+  .feedback{border-radius:var(--radius);border:1px solid var(--hairline);padding:14px 16px;margin-bottom:14px;
+    background:var(--surface);}
+  .feedback.ok{border-color:rgba(12,163,12,.45);}
+  .feedback.no{border-color:rgba(208,59,59,.45);}
+  .fb-title{font-weight:700;font-size:15px;margin-bottom:4px;}
+  .feedback.ok .fb-title{color:var(--good);}
+  .feedback.no .fb-title{color:var(--bad);}
+  .fb-detail{font-size:13.5px;color:var(--ink-2);}
+  .fb-detail b{color:var(--ink);}
+  .fb-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .fb-actions .next{background:var(--mode-c,var(--accent));border-color:transparent;color:#fff;font-weight:600;}
+  .kbd{display:inline-block;font-size:11px;color:var(--ink-3);border:1px solid var(--hairline);
+    border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px;}
+
+  /* ---------- 热身 ---------- */
+  .drone-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);
+    border:1px solid var(--hairline);border-radius:var(--radius);margin-bottom:12px;}
+  .pattern-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);
+    border:1px solid var(--hairline);border-radius:12px;margin-bottom:8px;}
+  .pattern-row .deg-seq{font-weight:600;letter-spacing:.06em;}
+  .pattern-row .deg-seq span.cur{color:var(--accent-warm);}
+  .pattern-row .why{font-size:12px;color:var(--ink-3);}
+  .playmini{width:38px;height:38px;border-radius:50%;flex:none;font-size:14px;display:flex;align-items:center;justify-content:center;}
+
+  /* ---------- 图鉴 ---------- */
+  .dex-item{padding:12px 14px;background:var(--surface);border:1px solid var(--hairline);border-radius:12px;margin-bottom:10px;}
+  .dex-item .deg{font-weight:700;letter-spacing:.05em;}
+  .dex-item .hint{font-size:12.5px;color:var(--ink-2);margin-top:3px;}
+  .dex-item .anchor-row{display:flex;gap:8px;margin-top:8px;align-items:center;}
+  .dex-item input{flex:1;font-size:12.5px;padding:6px 9px;}
+
+  /* ---------- 进度页 ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
+  .tile{background:var(--surface);border:1px solid var(--hairline);border-radius:12px;padding:12px 14px;}
+  .tile .t-label{font-size:12px;color:var(--ink-3);}
+  .tile .t-value{font-size:26px;font-weight:600;margin-top:2px;}
+  .tile .t-note{font-size:11.5px;color:var(--ink-3);margin-top:2px;}
+  .prog-section{margin-bottom:16px;}
+  .conf-item{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2);
+    padding:7px 0;border-bottom:1px solid var(--grid);}
+  .conf-item:last-child{border-bottom:none;}
+
+  /* ---------- 设置 ---------- */
+  .settings-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .settings-row label{font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:6px;}
+
+  .divider{border:none;border-top:1px solid var(--grid);margin:16px 0;}
+  .note-box{font-size:12.5px;color:var(--ink-3);background:var(--surface);border:1px dashed var(--hairline);
+    border-radius:12px;padding:10px 14px;}
+  @media (max-width:480px){
+    .opts{grid-template-columns:repeat(2,1fr);}
+    .quiz-stats{gap:9px;font-size:11.5px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+/* =====================================================================
+   J-Rock 练耳训练器 · 对应《Bassline 学习方法论》第三部分（阶段 0 到 3）
+   题库：J-Pop / J-Rock 高频套路（王道、小室、卡农、Axis、悲怆、下行线、丸サ、借用）
+   ===================================================================== */
+
+/* ---------------- 基础乐理数据 ---------------- */
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const KEYS = [
+  {name:"C", pc:0},{name:"D", pc:2},{name:"E", pc:4},{name:"F", pc:5},
+  {name:"G", pc:7},{name:"A", pc:9},{name:"B", pc:11}
+];
+// 级数定义：sd = 相对大调音级半音数, quality 决定和弦结构与标签
+const DEGREES = {
+  "1" :{semi:0,  q:"maj", label:"1",  color:"亮的家，完全稳定（T）"},
+  "2m":{semi:2,  q:"min", label:"2m", color:"柔和的出门，4 的暗版（S）"},
+  "3m":{semi:4,  q:"min", label:"3m", color:"半个家，最暧昧的一级（T）"},
+  "4" :{semi:5,  q:"maj", label:"4",  color:"出门，变亮变开阔（S）"},
+  "5" :{semi:7,  q:"maj", label:"5",  color:"紧张、悬着、想回家（D）"},
+  "6m":{semi:9,  q:"min", label:"6m", color:"暗的家，和 1 共享两个音（T）"},
+  "b6":{semi:8,  q:"maj", label:"b6", color:"平行小调借来的和弦，冲刺感"},
+  "b7":{semi:10, q:"maj", label:"b7", color:"平行小调借来的和弦，rock 味"},
+  "3(7)":{semi:4,q:"dom7",label:"3(7)",color:"副属和弦，亮但躁，强行推向 6m"},
+  "6(7)":{semi:9,q:"dom7",label:"6(7)",color:"副属和弦，推向 2m"},
+  "1(7)":{semi:0,q:"dom7",label:"1(7)",color:"1 加小七度变属七，推向 4"},
+  "4m":{semi:5, q:"min", label:"4m", color:"从平行小调借来的一秒哭腔"}
+};
+const CHORD_SHAPES = {
+  maj :[0,4,7],
+  min :[0,3,7],
+  dom7:[0,4,7,10],
+  maj7:[0,4,7,11],
+  min7:[0,3,7,10]
+};
+const QUALITY_INFO = {
+  maj :{label:"大三和弦", short:"大", feel:"亮、开阔、落地"},
+  min :{label:"小三和弦", short:"小", feel:"暗、收拢、往里收"},
+  dom7:{label:"属七和弦", short:"属七", feel:"亮但躁、悬着想解决"},
+  maj7:{label:"大七和弦", short:"maj7", feel:"亮但飘、city pop 的空气感"},
+  min7:{label:"小七和弦", short:"m7", feel:"暗但松弛、圆滑不刺"}
+};
+
+/* ---------------- 套路题库（1.3 词汇表） ---------------- */
+// steps: 每步 {deg 显示级数, root 相对主音半音(可为负,控制低音走向), shape, bassSemi 可选(转位低音)}
+const PATTERNS = [
+  {id:"oudou", name:"王道进行", degText:"4 5 3m 6m", lv:1,
+   steps:[{deg:"4",root:5,shape:"maj"},{deg:"5",root:7,shape:"maj"},{deg:"3m",root:4,shape:"min"},{deg:"6m",root:9,shape:"min"}],
+   hint:"4 出门、5 拉满张力、不回 1 而落 3m（伪终止变形），再顺三度滑进 6m。明亮和忧伤反复横跳，anime 感的来源。",
+   trick:"开头 4 到 5 往上顶，第 3 个和弦突然变暗又不落地，就是王道。"},
+  {id:"komuro", name:"小室进行", degText:"6m 4 5 1", lv:1,
+   steps:[{deg:"6m",root:-3,shape:"min"},{deg:"4",root:-7,shape:"maj"},{deg:"5",root:-5,shape:"maj"},{deg:"1",root:0,shape:"maj"}],
+   hint:"小调开头、大调落地。悲壮推进感，90 年代至今的 J-Rock 主力。",
+   trick:"第一拍就是暗的，结尾却结结实实回到亮的 1，落差感就是小室。"},
+  {id:"axis", name:"Axis 进行", degText:"1 5 6m 4", lv:1,
+   steps:[{deg:"1",root:0,shape:"maj"},{deg:"5",root:7,shape:"maj"},{deg:"6m",root:9,shape:"min"},{deg:"4",root:5,shape:"maj"}],
+   hint:"欧美流行万能循环，J-Rock 也大量使用。四个和弦覆盖 T D T S 一整圈，整体明亮。",
+   trick:"从亮的 1 出发绕一圈，中途经过暗的 6m 但很快离开。"},
+  {id:"canon", name:"卡农进行", degText:"1 5 6m 3m 4 1 4 5", lv:1,
+   steps:[{deg:"1",root:0,shape:"maj"},{deg:"5",root:7,shape:"maj",bassSemi:-1},{deg:"6m",root:-3,shape:"min"},{deg:"3m",root:4,shape:"min",bassSemi:-5},
+          {deg:"4",root:-7,shape:"maj"},{deg:"1",root:0,shape:"maj",bassSemi:-8},{deg:"4",root:-7,shape:"maj"},{deg:"5",root:-5,shape:"maj"}],
+   hint:"低音是一条下楼梯的音阶线（1 7 6 5 4 3 回 4 5），bass 手最能体会「低音线就是进行本体」。8 个和弦一组。",
+   trick:"和弦比别的套路多一倍、低音像下楼梯，基本就是卡农。"},
+  {id:"kudari", name:"下行线进行", degText:"1 5/7 6m 5", lv:2,
+   steps:[{deg:"1",root:0,shape:"maj"},{deg:"5/7",root:7,shape:"maj",bassSemi:-1},{deg:"6m",root:-3,shape:"min"},{deg:"5",root:-5,shape:"maj"}],
+   hint:"低音 1 7 6 5 半音加全音一路级进下滑，抒情歌常用。转位 5/7 存在的意义就是这条低音线。",
+   trick:"专听低音：一格一格往下走、每步都很近，就是下行线。"},
+  {id:"hisou", name:"悲怆循环", degText:"6m 4 1 5", lv:2,
+   steps:[{deg:"6m",root:-3,shape:"min"},{deg:"4",root:-7,shape:"maj"},{deg:"1",root:0,shape:"maj"},{deg:"5",root:-5,shape:"maj"}],
+   hint:"和 Axis 同一组和弦换起点，从 6m 起整体偏暗，情绪摇滚常用。",
+   trick:"和小室一样从暗开头，但第 3 个就早早回 1、结尾悬在 5 上不落地。"},
+  {id:"marusa", name:"丸サ进行", degText:"4 3(7) 6m", lv:3,
+   steps:[{deg:"4",root:5,shape:"maj7"},{deg:"3(7)",root:4,shape:"dom7"},{deg:"6m",root:-3,shape:"min7"},{deg:"6m",root:-3,shape:"min7"}],
+   hint:"「Just the Two of Us 进行」。3 级从小和弦变成属七（副属和弦），city pop、R&B 味的关键。",
+   trick:"第 2 个和弦又亮又躁、明显不在调里，然后被推进暗的 6m，就是丸サ。"},
+  {id:"b6b7", name:"平行调借用", degText:"b6 b7 1", lv:3,
+   steps:[{deg:"b6",root:-4,shape:"maj"},{deg:"b7",root:-2,shape:"maj"},{deg:"1",root:0,shape:"maj"},{deg:"1",root:0,shape:"maj"}],
+   hint:"从平行小调借来的冲刺式终止，rock、metal 的段落收尾常客。全大和弦整体半音阶往上撞回 1。",
+   trick:"两个调外的大和弦连续往上顶、最后撞在 1 上，冲刺感极强。"}
+];
+
+/* ---------------- 模式与档位 ---------------- */
+const MODES = {
+  root:{
+    key:"root", stage:"阶段 1", name:"根音追踪", cssColor:"var(--accent)", meterCls:"",
+    desc:"先只听一条线：低音落在几级。这比听整个和弦简单一个数量级，是 bass 手的主场。",
+    levels:[
+      {id:"root-1", kind:"deg", name:"档 1 · 四大金刚", goal:"听辨 1 / 4 / 5 / 6m。易混的 5 和 6m 会加量出现；1 级永远换八度出现，防背音高", pool:["1","4","5","6m"]},
+      {id:"root-2", kind:"deg", name:"档 2 · 全顺阶", goal:"加入 2m 和 3m，六个级数全开（5、6m 仍加量）", pool:["1","2m","3m","4","5","6m"]},
+      {id:"root-3", kind:"seq", name:"档 3 · 根音走向", goal:"听 4 个和弦，选出完整的根音走向", pool:null},
+      {id:"root-4", kind:"cadence", name:"档 4 · 终止式", goal:"5 之后去哪了：正格回 1 / 伪终止落 6m 或 3m / 半终止悬着", pool:null}
+    ]
+  },
+  quality:{
+    key:"quality", stage:"阶段 2", name:"性质听辨", cssColor:"var(--accent-quality)", meterCls:"q",
+    desc:"大 = 亮，小 = 暗，先把这一对刻进耳朵，再补属七。每天 2 分钟，和阶段 1 并行。",
+    levels:[
+      {id:"q-1", kind:"quality", name:"档 1 · 三度对比", goal:"根音加大三度 vs 根音加小三度（bass 音色）", pool:["maj","min"]},
+      {id:"q-2", kind:"quality", name:"档 2 · 完整三和弦", goal:"大三和弦 vs 小三和弦", pool:["maj","min"]},
+      {id:"q-3", kind:"quality", name:"档 3 · 加入属七", goal:"大、小、属七三种颜色，够用很久", pool:["maj","min","dom7"]},
+      {id:"q-4", kind:"quality", name:"档 4 · 七和弦家族", goal:"maj7 / m7 / 属七，丸サ和 city pop 的原料", pool:["maj7","min7","dom7"]}
+    ]
+  },
+  pattern:{
+    key:"pattern", stage:"阶段 3", name:"套路整体识别", cssColor:"var(--accent-pattern)", meterCls:"p",
+    desc:"认单词，不认字母：把王道、小室、Axis、卡农当作整体声音印象来记，3 秒内报出套路名。",
+    levels:[
+      {id:"p-1", kind:"pattern", name:"档 1 · 四大套路", goal:"王道 / 小室 / Axis / 卡农", lv:1},
+      {id:"p-2", kind:"pattern", name:"档 2 · 六套路", goal:"加入悲怆循环、下行线（注意 Axis 换起点的陷阱）", lv:2},
+      {id:"p-3", kind:"pattern", name:"档 3 · 全套路", goal:"加入丸サ、平行调借用，词汇表全开", lv:3},
+      {id:"p-4", kind:"variant", name:"档 4 · 套路变奏", goal:"随机调加变奏伴奏（根五 / 全音符 / 加七和弦），换件衣服也认得出", lv:3},
+      {id:"p-5", kind:"outside", name:"档 5 · 调外和弦侦测", goal:"有没有外人？副属、借用 4m 还是 b6 b7（分析 SOP 第 3 步的听力版）", lv:3}
+    ]
+  }
+};
+const PASS_N = 20, PASS_RATE = 0.9; // 近 20 题 90% 过关
+
+/* ---------------- 热身（阶段 0）唱级数材料 ---------------- */
+const WARMUP_PATTERNS = [
+  {name:"上行音阶", degs:[1,2,3,4,5,6,7,8], why:"唱数字：1 2 3 4 5 6 7 1"},
+  {name:"下行音阶", degs:[8,7,6,5,4,3,2,1], why:"下来也要稳"},
+  {name:"骨干 1 3 5", degs:[1,3,5,3,1], why:"大三和弦的骨架"},
+  {name:"骨干 1 4 1 5 1", degs:[1,4,1,5,1], why:"最常用的功能跳进"},
+  {name:"骨干 1 6 1", degs:[1,6,1], why:"1 和 6m 的距离，先唱准再谈听辨"},
+  {name:"下探低音 5", degs:[1,-5,1], why:"bass 手最常用的下行跳进：1 往下到低音 5 再回来"}
+];
+const MAJOR_SCALE = [0,2,4,5,7,9,11];
+
+/* ================================================================
+   音频引擎（Web Audio 合成，无外部采样）
+   ================================================================ */
+const AE = {
+  ctx:null, master:null, group:null, timers:[], droneGroup:null,
+  ensure(){
+    if(!this.ctx){
+      const C = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new C();
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 20; comp.ratio.value = 6;
+      comp.attack.value = 0.004; comp.release.value = 0.18;
+      this.master = this.ctx.createGain();
+      this.master.gain.value = (S.data.settings.vol ?? 0.8);
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+    }
+    if(this.ctx.state === "suspended") this.ctx.resume();
+    return this.ctx;
+  },
+  setVol(v){ if(this.master) this.master.gain.value = v; },
+  midiHz(m){ return 440 * Math.pow(2,(m-69)/12); },
+
+  stopAll(keepDrone){
+    if(this.group){ try{ this.group.disconnect(); }catch(e){} this.group = null; }
+    this.timers.forEach(clearTimeout); this.timers = [];
+    if(!keepDrone) this.stopDrone();
+    setPlaying(false);
+  },
+
+  /* --- Karplus-Strong 拨弦合成：electric bass 与 clean 电吉他共用 --- */
+  ksCache:{}, _shaperCurve:null,
+  ks(midi, profile){
+    const sr = this.ctx.sampleRate;
+    const cacheKey = midi + "|" + profile + "|" + sr;
+    if(this.ksCache[cacheKey]) return this.ksCache[cacheKey];
+    const f = this.midiHz(midi);
+    const L = Math.max(2, Math.round(sr/f));
+    const isBass = profile === "bass";
+    const N = Math.ceil(sr * (isBass ? 3.0 : 2.2));
+    const data = new Float32Array(N);
+    // 激励：噪声 → 多次平滑（越平滑越像指弹的暗音头）→ 拨弦位置梳状滤波
+    const exc = new Float32Array(L);
+    let seed = (midi*2654435761) >>> 0;
+    const rnd = ()=>{ seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296*2 - 1; };
+    for(let i=0;i<L;i++) exc[i] = rnd();
+    const passes = isBass ? 5 : 2;
+    for(let p=0;p<passes;p++){ let prev = exc[L-1]; for(let i=0;i<L;i++){ const c = exc[i]; exc[i] = (prev+c)/2; prev = c; } }
+    const P = Math.max(1, Math.round(L*0.31));
+    for(let i=0;i<L;i++) data[i] = exc[i] - 0.5*exc[(i-P+L)%L];
+    // 弦衰减：低音弦余音长，高音弦短
+    const t60 = isBass ? Math.min(3.0, Math.max(0.9, 2.6*55/f)) : Math.min(1.8, Math.max(0.55, 1.5*196/f));
+    const d = Math.exp(-6.907/(f*t60));   // 每循环一周衰减一次，t60 秒后降到千分之一
+    for(let n=L; n<N; n++){
+      const j = n-L-1;
+      data[n] = d * 0.5 * (data[n-L] + data[j < 0 ? L-1 : j]);
+    }
+    let mx = 0; for(let i=0;i<N;i++){ const a = Math.abs(data[i]); if(a>mx) mx = a; }
+    const g = mx > 0 ? 0.9/mx : 1;
+    for(let i=0;i<N;i++) data[i] *= g;
+    const buf = this.ctx.createBuffer(1, N, sr);
+    buf.getChannelData(0).set(data);
+    this.ksCache[cacheKey] = buf;
+    return buf;
+  },
+  shaper(){
+    if(!this._shaperCurve){
+      const c = new Float32Array(1024);
+      for(let i=0;i<1024;i++){ const x = i/511.5 - 1; c[i] = Math.tanh(1.7*x); }
+      this._shaperCurve = c;
+    }
+    const ws = this.ctx.createWaveShaper(); ws.curve = this._shaperCurve; ws.oversample = "2x";
+    return ws;
+  },
+
+  /* --- 音色：electric bass（KS 拨弦 + 轻微过载 + tone 旋钮） --- */
+  bass(dest, t, dur, midi, vel){
+    const ctx = this.ctx, f = this.midiHz(midi);
+    const src = ctx.createBufferSource(); src.buffer = this.ks(midi, "bass");
+    src.playbackRate.value = 1 + (Math.random()*2-1)*0.0012;
+    const ws = this.shaper();
+    const flt = ctx.createBiquadFilter(); flt.type = "lowpass"; flt.Q.value = 0.7;
+    flt.frequency.value = Math.min(2400, Math.max(650, f*10));
+    const g = ctx.createGain();
+    const peak = 0.62*vel;
+    g.gain.setValueAtTime(peak, t);
+    g.gain.setValueAtTime(peak, Math.max(t, t+dur-0.045));
+    g.gain.linearRampToValueAtTime(0.0001, t+dur+0.03);
+    src.connect(ws); ws.connect(flt); flt.connect(g); g.connect(dest);
+    src.start(t); src.stop(t+dur+0.06);
+  },
+
+  /* --- 音色：clean 电吉他拨弦（和弦垫默认音色） --- */
+  gtr(dest, t, dur, midi, vel){
+    const ctx = this.ctx, f = this.midiHz(midi);
+    const src = ctx.createBufferSource(); src.buffer = this.ks(midi, "gtr");
+    src.playbackRate.value = 1 + (Math.random()*2-1)*0.0018;
+    const flt = ctx.createBiquadFilter(); flt.type = "lowpass"; flt.Q.value = 0.5;
+    flt.frequency.value = Math.min(5200, Math.max(1800, f*8));
+    const g = ctx.createGain();
+    const peak = 0.34*vel;
+    g.gain.setValueAtTime(peak, t);
+    g.gain.setValueAtTime(peak, Math.max(t, t+dur-0.06));
+    g.gain.linearRampToValueAtTime(0.0001, t+dur+0.12);
+    src.connect(flt); flt.connect(g); g.connect(dest);
+    src.start(t); src.stop(t+dur+0.15);
+  },
+
+  /* --- 音色：电钢琴风和弦音 --- */
+  ep(dest, t, dur, midi, vel){
+    const ctx = this.ctx, f = this.midiHz(midi);
+    const parts = [
+      {mult:1,    type:"sine",     g:0.50, dec:null},
+      {mult:1.003,type:"triangle", g:0.16, dec:null},
+      {mult:2,    type:"sine",     g:0.13, dec:null},
+      {mult:4,    type:"sine",     g:0.07, dec:0.30}   // 铃铛质感的敲击瞬态
+    ];
+    const g = ctx.createGain();
+    const peak = 0.34*vel;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t+0.012);
+    g.gain.exponentialRampToValueAtTime(peak*0.45, t+0.8);
+    g.gain.setValueAtTime(peak*0.45, Math.max(t+0.8, t+dur-0.02));
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur+0.25);
+    const flt = ctx.createBiquadFilter(); flt.type = "lowpass"; flt.frequency.value = 3400; flt.Q.value = 0.4;
+    flt.connect(g); g.connect(dest);
+    for(const p of parts){
+      const o = ctx.createOscillator(); o.type = p.type; o.frequency.value = f*p.mult;
+      const pg = ctx.createGain(); pg.gain.value = p.g;
+      if(p.dec){ pg.gain.setValueAtTime(p.g, t); pg.gain.exponentialRampToValueAtTime(0.001, t+p.dec); }
+      o.connect(pg); pg.connect(flt);
+      o.start(t); o.stop(t+dur+0.3);
+    }
+  },
+
+  /* --- 音色：热身参考音 --- */
+  tone(dest, t, dur, midi, vel){
+    const ctx = this.ctx, f = this.midiHz(midi);
+    const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = f;
+    const g = ctx.createGain(); const peak = 0.30*(vel||1);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(peak, t+0.03);
+    g.gain.setValueAtTime(peak, Math.max(t+0.03, t+dur-0.08));
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur+0.08);
+    o.connect(g); o2.connect(g); g.connect(dest);
+    o.start(t); o2.start(t); o.stop(t+dur+0.15); o2.stop(t+dur+0.15);
+  },
+
+  /* --- 播放一段乐谱 events:[{t,dur,midi,voice,vel}] 单位:拍 --- */
+  play(events, opts){
+    const o = opts || {};
+    const ctx = this.ensure();
+    this.stopAll(true);
+    this.group = ctx.createGain(); this.group.gain.value = 1; this.group.connect(this.master);
+    const bpm = o.bpm || S.data.settings.bpm || 100;
+    const spb = 60/bpm;
+    const t0 = ctx.currentTime + 0.1;
+    let end = 0;
+    for(const ev of events){
+      const t = t0 + ev.t*spb, dur = Math.max(0.05, ev.dur*spb);
+      end = Math.max(end, ev.t*spb + dur);
+      if(ev.voice === "bass") this.bass(this.group, t, dur, ev.midi, ev.vel ?? 1);
+      else if(ev.voice === "ep"){
+        if((S.data.settings.chordVoice || "gtr") === "ep") this.ep(this.group, t, dur, ev.midi, ev.vel ?? 1);
+        else this.gtr(this.group, t, dur, ev.midi, ev.vel ?? 1);
+      }
+      else this.tone(this.group, t, dur, ev.midi, ev.vel ?? 1);
+    }
+    const lead = (t0 - ctx.currentTime);
+    (o.marks || []).forEach(mk=>{
+      this.timers.push(setTimeout(()=>{ mk.fn(); }, Math.max(0,(lead + mk.t*spb)*1000)));
+    });
+    setPlaying(true);
+    this.timers.push(setTimeout(()=>{ setPlaying(false); if(o.onEnd) o.onEnd(); }, (lead+end)*1000 + 350));
+  },
+
+  toggleDrone(midiA, midiB){
+    if(this.droneGroup){ this.stopDrone(); return false; }
+    const ctx = this.ensure();
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(this.master);
+    g.gain.linearRampToValueAtTime(0.10, ctx.currentTime+0.6);
+    const flt = ctx.createBiquadFilter(); flt.type = "lowpass"; flt.frequency.value = 650; flt.connect(g);
+    [[midiA,"sawtooth",-4],[midiA,"sawtooth",4],[midiB,"sine",0]].forEach(([m,ty,det])=>{
+      const o = ctx.createOscillator(); o.type = ty; o.frequency.value = this.midiHz(m); o.detune.value = det;
+      o.connect(flt); o.start();
+      this.droneGroup = this.droneGroup || {nodes:[],g};
+      this.droneGroup.nodes.push(o);
+    });
+    return true;
+  },
+  stopDrone(){
+    if(!this.droneGroup) return;
+    try{
+      const ctx = this.ctx;
+      this.droneGroup.g.gain.cancelScheduledValues(ctx.currentTime);
+      this.droneGroup.g.gain.setValueAtTime(this.droneGroup.g.gain.value, ctx.currentTime);
+      this.droneGroup.g.gain.linearRampToValueAtTime(0.0001, ctx.currentTime+0.25);
+      const dg = this.droneGroup;
+      setTimeout(()=>{ dg.nodes.forEach(n=>{try{n.stop();}catch(e){}}); try{dg.g.disconnect();}catch(e){} }, 400);
+    }catch(e){}
+    this.droneGroup = null;
+  }
+};
+
+/* ================================================================
+   记谱工具：调、低音摆位、和弦排列（voice leading）
+   ================================================================ */
+function keyObj(){
+  const st = S.data.settings;
+  if(st.random){ return KEYS[Math.floor(Math.random()*KEYS.length)]; }
+  return KEYS.find(k=>k.name===st.key) || KEYS[2];
+}
+function noteName(midi){ return NOTE_NAMES[((midi%12)+12)%12]; }
+function noteNameOct(midi){ return NOTE_NAMES[((midi%12)+12)%12] + (Math.floor(midi/12)-1); }
+// bass 主音摆在 G1 到 F#2 区间，级数按「就近」原则摆（5、6m 落在主音下方，是最常听到的走向）
+function bassTonic(pc){ return 31 + ((pc - 7 + 12) % 12); }
+function nearestSemi(semi){ const s = ((semi%12)+12)%12; return s > 6 ? s-12 : s; }
+function foldBass(m){ while(m < 25) m += 12; while(m > 48) m -= 12; return m; }
+// 一整条低音线：按 offsets（带方向）整体平移进合理音区
+function bassLine(pc, offsets){
+  const base = bassTonic(pc);
+  let notes = offsets.map(o=>base+o);
+  for(const sh of [0,12,-12,24]){
+    const mn = Math.min(...notes)+sh, mx = Math.max(...notes)+sh;
+    if(mn >= 25 && mx <= 48){ notes = notes.map(n=>n+sh); break; }
+  }
+  return notes.map(foldBass);
+}
+// 和弦排列：候选转位中选离上一个和弦最近的（平滑连接）
+function voicings(rootPc, shape){
+  const ivs = CHORD_SHAPES[shape] || CHORD_SHAPES.maj;
+  const out = [];
+  for(let inv=0; inv<ivs.length; inv++){
+    const pcs = ivs.map((v,i)=> (rootPc + ivs[(i+inv)%ivs.length]) % 12);
+    let cur = [], last = -1;
+    for(const p of pcs){ let n = 48 + p; while(n <= last) n += 12; cur.push(n); last = n; }
+    while(Math.min(...cur) < 50) cur = cur.map(n=>n+12);
+    while(Math.min(...cur) > 63) cur = cur.map(n=>n-12);
+    out.push(cur);
+  }
+  return out;
+}
+function voiceLead(prev, rootPc, shape){
+  const cands = voicings(rootPc, shape);
+  if(!prev) return cands[0];
+  let best = cands[0], bestCost = Infinity;
+  for(const c of cands){
+    let cost = 0;
+    for(const n of c){ cost += Math.min(...prev.map(p=>Math.abs(p-n))); }
+    if(cost < bestCost){ bestCost = cost; best = c; }
+  }
+  return best;
+}
+
+/* ---- 乐句生成 ---- */
+// 根音追踪：定调 1 级 2 拍，停 0.5 拍，目标和弦 2 拍
+// bassNote 可选：由出题器指定目标音的具体八度（三八度系统）
+function buildRootQuestion(key, degKey, bassNote){
+  const d = DEGREES[degKey];
+  const tb = bassTonic(key.pc);
+  const targetBass = (bassNote !== undefined) ? bassNote : foldBass(tb + nearestSemi(d.semi));
+  const ev = [], marks = [];
+  const anchorV = voiceLead(null, key.pc, "maj");
+  anchorV.forEach((m,i)=> ev.push({t:0+i*0.028, dur:1.9, midi:m, voice:"ep", vel:0.8}));
+  ev.push({t:0, dur:0.9, midi:tb, voice:"bass", vel:1});
+  ev.push({t:1, dur:0.9, midi:tb, voice:"bass", vel:0.75});
+  const tv = voiceLead(anchorV, (key.pc+d.semi)%12, d.q);
+  tv.forEach((m,i)=> ev.push({t:2.5+i*0.028, dur:2.2, midi:m, voice:"ep", vel:0.85}));
+  ev.push({t:2.5, dur:0.9, midi:targetBass, voice:"bass", vel:1});
+  ev.push({t:3.5, dur:1.1, midi:targetBass, voice:"bass", vel:0.8});
+  return {events:ev, marks:[
+    {t:0,   text:"定调：这是 1 级（" + key.name + " 大调）"},
+    {t:2.5, text:"目标和弦：低音落在几级？"}
+  ], bassNote:targetBass, tonicNote:tb};
+}
+// 进行播放（套路 / 根音走向 / 终止式共用）：每和弦 2 拍
+// opts: {bassStyle:"8ths"|"half"|"root5", seventh:true} 供套路变奏档使用
+function buildProgression(key, steps, loops, opts){
+  const o = opts || {};
+  let steps2 = steps;
+  if(o.seventh){
+    steps2 = steps.map(s=>{
+      if(s.deg && s.deg[0] === "b") return s;
+      const rel = ((s.root % 12) + 12) % 12;
+      if(s.shape === "maj") return Object.assign({}, s, {shape: rel === 7 ? "dom7" : "maj7"});
+      if(s.shape === "min") return Object.assign({}, s, {shape: "min7"});
+      return s;
+    });
+  }
+  const ev = [], dots = [];
+  const bl = bassLine(key.pc, steps2.map(s=> (s.bassSemi!==undefined? s.bassSemi : s.root)));
+  const fifthOf = m => (m+7 <= 48 ? m+7 : m-5);
+  let prevV = null; const vs = [];
+  for(const s of steps2){ prevV = voiceLead(prevV, ((key.pc + s.root)%12+12)%12, s.shape); vs.push(prevV); }
+  const L = loops || (steps2.length <= 4 ? 2 : 1);
+  const n = steps2.length;
+  for(let lp=0; lp<n*L; lp++){
+    const i = lp % n, base = lp*2;
+    const isLast = (lp === n*L-1);
+    vs[i].forEach((m,vi)=> ev.push({t:base+vi*0.028, dur:isLast?2.6:1.95, midi:m, voice:"ep", vel:0.72}));
+    let style = o.bassStyle || "8ths";
+    if(steps2[i].bassSemi !== undefined && style === "root5") style = "8ths"; // 转位低音保持踏住
+    if(isLast){
+      ev.push({t:base, dur:2.6, midi:bl[i], voice:"bass", vel:1});
+    }else if(style === "half"){
+      ev.push({t:base, dur:1.9, midi:bl[i], voice:"bass", vel:1});
+    }else if(style === "root5"){
+      ev.push({t:base, dur:0.92, midi:bl[i], voice:"bass", vel:1});
+      ev.push({t:base+1, dur:0.92, midi:fifthOf(bl[i]), voice:"bass", vel:0.8});
+    }else{
+      [0,0.5,1,1.5].forEach((off,k)=> ev.push({t:base+off, dur:0.42, midi:bl[i], voice:"bass", vel:[1,0.6,0.8,0.6][k]}));
+    }
+    dots.push({t:base, i:lp, n:n*L});
+  }
+  return {events:ev, dots, bassLine:bl, total:n*L*2};
+}
+// 拼接多段进行（A/B 对比听用）
+function concatProgs(parts){
+  const ev = [], caps = []; let off = 0;
+  for(const p of parts){
+    p.prog.events.forEach(e=> ev.push(Object.assign({}, e, {t:e.t+off})));
+    caps.push({t:off, text:p.cap});
+    off += p.prog.total + 1;
+  }
+  return {events:ev, caps};
+}
+// 性质听辨
+function buildQualityQuestion(level, q){
+  const ev = [];
+  if(level === 1){
+    const root = 38 + Math.floor(Math.random()*11); // D2..C3
+    const third = root + (q === "maj" ? 4 : 3);
+    ev.push({t:0, dur:0.95, midi:root, voice:"bass", vel:1});
+    ev.push({t:1, dur:0.95, midi:third, voice:"bass", vel:0.9});
+    ev.push({t:2, dur:1.8, midi:root, voice:"bass", vel:0.95});
+    ev.push({t:2, dur:1.8, midi:third, voice:"bass", vel:0.8});
+    return {events:ev, root};
+  }
+  const root = 52 + Math.floor(Math.random()*9); // E3..C4
+  const shape = CHORD_SHAPES[q];
+  [0,2].forEach(t0=>{
+    shape.forEach((iv,i)=> ev.push({t:t0+i*0.03, dur:1.9, midi:root+iv, voice:"ep", vel: t0===0?0.9:0.75}));
+    ev.push({t:t0, dur:1.9, midi:root-24, voice:"bass", vel: t0===0?0.9:0.7});
+  });
+  return {events:ev, root};
+}
+function qualityCompareEvents(root, qA, qB, level){
+  const ev = [];
+  const put = (q,t0,vel)=>{
+    if(level === 1){
+      const third = root + (q==="maj"?4:3);
+      ev.push({t:t0, dur:0.8, midi:root, voice:"bass", vel});
+      ev.push({t:t0+0.85, dur:0.8, midi:third, voice:"bass", vel});
+      ev.push({t:t0+1.7, dur:1.4, midi:root, voice:"bass", vel});
+      ev.push({t:t0+1.7, dur:1.4, midi:third, voice:"bass", vel:vel*0.85});
+    }else{
+      CHORD_SHAPES[q].forEach((iv,i)=> ev.push({t:t0+i*0.03, dur:2.4, midi:root+iv, voice:"ep", vel}));
+      ev.push({t:t0, dur:2.4, midi:root-24, voice:"bass", vel});
+    }
+  };
+  put(qA, 0, 0.9); put(qB, 3.6, 0.9);
+  return ev;
+}
+
+/* ================================================================
+   进度存储（本地文件打开时自动长期保存；侧边栏里用导出/导入迁移）
+   ================================================================ */
+const DATA_KEY = "jrockEarTrainer.v1";
+const store = {
+  mem:{}, ok:false,
+  init(){ try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); this.ok = true; }catch(e){ this.ok = false; } },
+  get(k){ if(this.ok){ try{ return localStorage.getItem(k); }catch(e){} } return (k in this.mem)? this.mem[k] : null; },
+  set(k,v){ if(this.ok){ try{ localStorage.setItem(k,v); return; }catch(e){} } this.mem[k] = v; }
+};
+store.init();
+function defaultData(){
+  return {v:1, days:{}, levels:{}, conf:{}, anchors:{},
+          settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", rootHighOct:false}};
+}
+function loadData(){
+  try{
+    const raw = store.get(DATA_KEY);
+    if(raw){ const d = JSON.parse(raw); return Object.assign(defaultData(), d, {settings:Object.assign(defaultData().settings, d.settings||{})}); }
+  }catch(e){}
+  return defaultData();
+}
+function saveData(){ try{ store.set(DATA_KEY, JSON.stringify(S.data)); }catch(e){} }
+function todayStr(){ const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function levelStat(id){
+  if(!S.data.levels[id]) S.data.levels[id] = {a:0,c:0,streak:0,best:0,recent:[],passed:false};
+  return S.data.levels[id];
+}
+function recent20Rate(st){ if(!st.recent.length) return null; return st.recent.reduce((x,y)=>x+y,0)/st.recent.length; }
+function recordAnswer(levelId, correct, chosen){
+  const ok = (correct === chosen);
+  const st = levelStat(levelId);
+  st.a++; if(ok) st.c++;
+  st.streak = ok ? st.streak+1 : 0;
+  st.best = Math.max(st.best, st.streak);
+  st.recent.push(ok?1:0); if(st.recent.length > PASS_N) st.recent.shift();
+  if(!st.passed && st.recent.length >= PASS_N && recent20Rate(st) >= PASS_RATE){ st.passed = true; st.passedOn = todayStr(); }
+  const day = S.data.days[todayStr()] || (S.data.days[todayStr()] = {n:0,c:0});
+  day.n++; if(ok) day.c++;
+  if(!ok){
+    const cf = S.data.conf[levelId.split("-")[0]] || (S.data.conf[levelId.split("-")[0]] = {});
+    const kk = correct + " 听成 " + chosen;
+    cf[kk] = (cf[kk]||0) + 1;
+  }
+  saveData();
+  return ok;
+}
+function dayStreak(){
+  const fmt = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const d = new Date();
+  const has = ()=> S.data.days[fmt(d)] && S.data.days[fmt(d)].n > 0;
+  if(!has()) d.setDate(d.getDate()-1);  // 今天还没练就从昨天开始数
+  let n = 0;
+  while(has()){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+
+/* ================================================================
+   根音走向（root-3）题库
+   ================================================================ */
+const SEQ_POOL = [
+  {seq:["1","5","6m","4"],  note:"这就是 Axis 进行"},
+  {seq:["6m","4","5","1"],  note:"这就是小室进行"},
+  {seq:["4","5","3m","6m"], note:"这就是王道进行"},
+  {seq:["1","6m","4","5"],  note:"50 年代循环，1 和 6m 同为家、先亮后暗"},
+  {seq:["6m","4","1","5"],  note:"这就是悲怆循环"},
+  {seq:["1","3m","6m","4"], note:"鲜花的主循环：全程不碰属功能，一直悬着"},
+  {seq:["2m","5","1","6m"], note:"2m 5 1 连锁（五度下行）加 6m 回钩"},
+  {seq:["1","4","5","4"],   note:"朋克味的 1 4 5 循环"}
+];
+const SIB = {"1":"6m","6m":"1","4":"2m","2m":"4","3m":"6m"};
+
+/* ---------------- 终止式（root-4）题库 ---------------- */
+const CADENCE_POOL = [
+  {cat:"auth", opt:"正格终止：5 → 1", label:"正格终止（5 回 1）",
+   seqs:[["1","4","5","1"],["1","2m","5","1"],["6m","4","5","1"]],
+   why:"结结实实回家，最强的解决。"},
+  {cat:"dec6", opt:"伪终止：5 → 6m", label:"伪终止（5 落 6m）",
+   seqs:[["1","4","5","6m"],["1","2m","5","6m"]],
+   why:"以为要到家了，结果进了另一扇门。J-Pop 的忧伤感大量来自这一手。"},
+  {cat:"dec3", opt:"伪终止：5 → 3m", label:"伪终止变形（5 落 3m）",
+   seqs:[["1","4","5","3m"],["1","2m","5","3m"]],
+   why:"落在半个家 3m 上，暗但不落地。王道进行 4 5 3m 6m 的招牌动作就是它。"},
+  {cat:"half", opt:"半终止：停在 5", label:"半终止（停在 5）",
+   seqs:[["1","6m","4","5"],["1","6m","2m","5"]],
+   why:"悬在 5 上不解决，像副歌前的深呼吸，逼着你等那个 1。"}
+];
+
+/* ---------------- 调外和弦侦测（p-5）题库 ---------------- */
+const OUTSIDE_CATS = [
+  {value:"none",   label:"全调内，没有外人"},
+  {value:"secdom", label:"有副属和弦", sub:"该小的级数变大/属七"},
+  {value:"iv",     label:"借用 4m", sub:"4 突然变小，一秒哭腔"},
+  {value:"b67",    label:"借用 b6 b7", sub:"带 b 的级数往上撞"}
+];
+const OUTSIDE_POOL = [
+  {cat:"none", seq:["1","4","5","1"],    twin:null, outsider:null, why:"四个和弦都在调内，规规矩矩。"},
+  {cat:"none", seq:["1","6m","2m","5"],  twin:null, outsider:null, why:"全顺阶，一个外人都没有。"},
+  {cat:"none", seq:["4","5","3m","6m"],  twin:null, outsider:null, why:"这是王道进行，听着戏剧化但全在调内。"},
+  {cat:"secdom", seq:["1","3(7)","6m","4"], twin:["1","3m","6m","4"], outsider:"3(7)",
+   why:"调内 3 级本该是小和弦，突然变成属七：这是硬要推去 6m 的副属和弦（丸サ也用它）。"},
+  {cat:"secdom", seq:["1","6(7)","2m","5"], twin:["1","6m","2m","5"], outsider:"6(7)",
+   why:"6 级从小和弦变成属七，副属推向 2m。"},
+  {cat:"secdom", seq:["1","1(7)","4","1"], twin:["1","1","4","1"], outsider:"1(7)",
+   why:"1 自己加上小七度变成属七，产生「要去 4」的推力。"},
+  {cat:"iv", seq:["1","4","4m","1"], twin:["1","4","4","1"], outsider:"4m",
+   why:"4 走到一半突然变成 4m：从平行小调借来的「一秒变哭腔」，J-Pop 用滥了的经典手法。"},
+  {cat:"iv", seq:["6m","4","4m","1"], twin:["6m","4","4","1"], outsider:"4m",
+   why:"先暗后哭：4 变 4m 再落回 1，抒情副歌收尾常客。"},
+  {cat:"b67", seq:["1","b6","b7","1"], twin:["1","4","5","1"], outsider:"b6 b7",
+   why:"出现带 b 的级数就是借用：b6 b7 连续往上顶、撞回 1 的冲刺式终止，rock 和 metal 的段落收尾常客。"},
+  {cat:"b67", seq:["6m","b6","b7","1"], twin:["6m","4","5","1"], outsider:"b6 b7",
+   why:"从 6m 出发借 b6 b7 冲回 1，比正格终止猛得多。"}
+];
+const OUTSIDE_RULE = {
+  secdom:"识别规则：调内本该是小和弦的级数（2、3、6）突然变成大和弦或属七，就是副属。",
+  iv:"识别规则：4 突然变成 4m，或出现带 b 的级数，就是从平行小调借来的。",
+  b67:"识别规则：出现带 b 的级数（b3、b6、b7）就是借用和弦。",
+  none:"先问自己：每个和弦都还在 1 2m 3m 4 5 6m 里吗？"
+};
+function seqDistractors(seq){
+  const out = [], used = new Set([seq.join(">")]);
+  const push = s=>{ const k = s.join(">"); if(!used.has(k)){ used.add(k); out.push(s); } };
+  const swap = (i,j)=>{ const s = seq.slice(); [s[i],s[j]] = [s[j],s[i]]; return s; };
+  push(swap(1,2)); push(swap(2,3)); push(swap(0,1));
+  for(let i=0; i<seq.length && out.length<3; i++){
+    if(SIB[seq[i]]){ const s = seq.slice(); s[i] = SIB[seq[i]]; push(s); }
+  }
+  return out.slice(0,3);
+}
+
+/* ================================================================
+   应用状态与渲染
+   ================================================================ */
+const S = {
+  screen:"home", modeKey:null, levelIdx:0,
+  q:null, answered:false, feedback:null, chosenIdx:-1,
+  lastQ:{}, lastDeg:{}, playing:false, droneOn:false,
+  ioText:"", ioMsg:"", resetArmed:false,
+  data: loadData()
+};
+
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function pct(r){ return Math.round(r*100) + "%"; }
+function setCaption(t){ const el = document.getElementById("playCaption"); if(el) el.textContent = t; }
+function setDot(i){ const el = document.getElementById("beatDots"); if(!el) return;
+  [...el.children].forEach((c,j)=> c.classList.toggle("on", j<=i)); }
+function clearDots(){ const el = document.getElementById("beatDots"); if(el) [...el.children].forEach(c=>c.classList.remove("on")); }
+function setPlaying(b){ S.playing = b; const el = document.getElementById("bigplayBtn"); if(el) el.classList.toggle("playing", b); }
+
+function chordNameForDegree(key, degKey){
+  const d = DEGREES[degKey];
+  const pc = ((key.pc + d.semi) % 12 + 12) % 12;
+  const suf = {maj:"", min:"m", dom7:"7", maj7:"maj7", min7:"m7"}[d.q] || "";
+  return NOTE_NAMES[pc] + suf;
+}
+function patternChordNames(key, pat){
+  const suf = {maj:"", min:"m", dom7:"7", maj7:"maj7", min7:"m7"};
+  const out = [];
+  let prevDeg = null;
+  for(const s of pat.steps){
+    if(s.deg === prevDeg) continue; prevDeg = s.deg;
+    const pc = ((key.pc + s.root) % 12 + 12) % 12;
+    let nm = NOTE_NAMES[pc] + (suf[s.shape] || "");
+    if(s.bassSemi !== undefined){ nm += "/" + NOTE_NAMES[((key.pc + s.bassSemi) % 12 + 12) % 12]; }
+    out.push(nm);
+  }
+  return out.join("  ");
+}
+function seqToSteps(seq){
+  let prev = null; const steps = [];
+  for(const dk of seq){
+    const d = DEGREES[dk]; let c = nearestSemi(d.semi);
+    if(prev !== null){
+      let best = c, bd = Math.abs(c - prev);
+      for(const cand of [c-12, c+12]){ const dd = Math.abs(cand - prev); if(dd < bd){ bd = dd; best = cand; } }
+      c = best;
+    }
+    prev = c;
+    steps.push({deg:dk, root:c, shape:d.q});
+  }
+  return steps;
+}
+
+/* ---------------- 出题 ---------------- */
+function pickAvoid(arr, levelId, keyFn){
+  const last = S.lastQ[levelId];
+  let x = arr[Math.floor(Math.random()*arr.length)];
+  for(let i=0; i<4 && arr.length>1 && keyFn(x)===last; i++) x = arr[Math.floor(Math.random()*arr.length)];
+  S.lastQ[levelId] = keyFn(x);
+  return x;
+}
+/* 根音追踪的三八度出题器：
+   - 5 和 6m 加权出现（易混对专项）
+   - 1 级永远不落在定调的那个八度（高八度或低八度，逼着认「身份」而非记音高）
+   - 高八度开关开：所有级数在三个八度里随机；关：非 1 级用默认摆位且不连续重复级数
+   - 任何情况下不连续出现完全相同的音高，同一级数最多连续两次 */
+const DEG_WEIGHTS = {"5":2.2, "6m":2.2};
+function degCandidates(deg, key, hi){
+  const tb = bassTonic(key.pc);
+  const inRange = m => m >= 26 && m <= 54;
+  if(deg === "1"){
+    const c = [tb-12, tb+12].filter(inRange);
+    return c.length ? c : [tb+12];
+  }
+  const p0 = foldBass(tb + nearestSemi(DEGREES[deg].semi));
+  return (hi ? [p0-12, p0, p0+12] : [p0]).filter(inRange);
+}
+function genDegTarget(level, key){
+  const hi = !!S.data.settings.rootHighOct;
+  const last = S.lastDeg[level.id] || {deg:null, midi:null, run:0};
+  const pool = level.pool;
+  const cum = []; let tot = 0;
+  for(const d of pool){ tot += (DEG_WEIGHTS[d] || 1); cum.push(tot); }
+  for(let attempt=0; attempt<40; attempt++){
+    const r = Math.random()*tot;
+    const deg = pool[cum.findIndex(x=>r<x)];
+    if(deg === last.deg && last.run >= 2) continue;                 // 同级数最多连两次
+    if(!hi && deg !== "1" && deg === last.deg) continue;            // 无八度混合时级数不重复
+    const avail = degCandidates(deg, key, hi).filter(m=>m !== last.midi);
+    if(!avail.length) continue;
+    const midi = avail[Math.floor(Math.random()*avail.length)];
+    S.lastDeg[level.id] = {deg, midi, run: deg === last.deg ? last.run+1 : 1};
+    return {deg, midi};
+  }
+  // 兜底：任选一个和上次音高不同的组合
+  for(const deg of pool){
+    const avail = degCandidates(deg, key, hi).filter(m=>m !== last.midi);
+    if(avail.length){ const midi = avail[0]; S.lastDeg[level.id] = {deg, midi, run:1}; return {deg, midi}; }
+  }
+  const deg = pool[0], midi = degCandidates(deg, key, hi)[0];
+  S.lastDeg[level.id] = {deg, midi, run:1};
+  return {deg, midi};
+}
+const VARIANT_DESC = {"8ths":"八分根音", "half":"全音符铺底", "root5":"根五交替"};
+function genQuestion(){
+  const mode = MODES[S.modeKey], level = mode.levels[S.levelIdx];
+  const kind = level.kind;
+  const key = keyObj();
+  S.answered = false; S.feedback = null; S.chosenIdx = -1;
+  if(kind === "deg"){
+    const t = genDegTarget(level, key);
+    const b = buildRootQuestion(key, t.deg, t.midi);
+    S.q = {kind:"root", key, level, events:b.events, bassNote:b.bassNote,
+      caps:b.marks, dots:null, answerValue:t.deg,
+      options: level.pool.map(k=>({value:k, label:DEGREES[k].label, sub:null})),
+      idle:"低音落在几级？"};
+  }else if(kind === "seq"){
+    const sp = pickAvoid(SEQ_POOL, level.id, x=>x.seq.join());
+    const steps = seqToSteps(sp.seq);
+    const prog = buildProgression(key, steps, 2);
+    const correct = sp.seq.join(" → ");
+    const opts = [ sp.seq ].concat(seqDistractors(sp.seq)).map(s=>({value:s.join(" → "), label:s.join(" → "), sub:null}));
+    for(let i=opts.length-1; i>0; i--){ const j = Math.floor(Math.random()*(i+1)); [opts[i],opts[j]] = [opts[j],opts[i]]; }
+    S.q = {kind:"seq", key, level, sp, steps, events:prog.events, dots:prog.dots, caps:null,
+      bassLineNotes:prog.bassLine, answerValue:correct, options:opts, idle:"根音走向是哪一条？"};
+  }else if(kind === "cadence"){
+    const cat = pickAvoid(CADENCE_POOL, level.id, x=>x.cat);
+    const seq = cat.seqs[Math.floor(Math.random()*cat.seqs.length)];
+    const prog = buildProgression(key, seqToSteps(seq), 1);
+    S.q = {kind:"cadence", key, level, cat, seq, events:prog.events, dots:prog.dots, caps:null,
+      answerValue:cat.cat,
+      options: CADENCE_POOL.map(c=>({value:c.cat, label:c.opt, sub:null})),
+      idle:"最后停在了哪里？"};
+  }else if(kind === "quality"){
+    const qNum = S.levelIdx + 1;
+    const target = pickAvoid(level.pool, level.id, x=>x);
+    const b = buildQualityQuestion(qNum, target);
+    const lab = q => qNum===1 ? (q==="maj"?"大三度":"小三度") : QUALITY_INFO[q].label;
+    S.q = {kind:"quality", key, level, qNum, root:b.root, events:b.events, caps:null, dots:null,
+      answerValue:target,
+      options: level.pool.map(k=>({value:k, label:lab(k), sub:QUALITY_INFO[k].feel})),
+      idle: qNum===1 ? "亮的还是暗的？" : "这是什么性质？"};
+  }else if(kind === "variant"){
+    const pat = pickAvoid(PATTERNS, level.id, x=>x.id);
+    const vkey = KEYS[Math.floor(Math.random()*KEYS.length)];   // 变奏档强制随机调
+    const vopts = {bassStyle: ["8ths","half","root5"][Math.floor(Math.random()*3)],
+                   seventh: Math.random() < 0.5};
+    const prog = buildProgression(vkey, pat.steps, null, vopts);
+    S.q = {kind:"variant", key:vkey, level, pat, vopts, events:prog.events, dots:prog.dots, caps:null,
+      answerValue:pat.name,
+      options: PATTERNS.map(p=>({value:p.name, label:p.name, sub:p.degText})),
+      idle:"换了伴奏和调，是哪个套路？"};
+  }else if(kind === "outside"){
+    const item = pickAvoid(OUTSIDE_POOL, level.id, x=>x.seq.join());
+    const prog = buildProgression(key, seqToSteps(item.seq), 2);
+    S.q = {kind:"outside", key, level, item, events:prog.events, dots:prog.dots, caps:null,
+      answerValue:item.cat,
+      options: OUTSIDE_CATS.map(c=>({value:c.value, label:c.label, sub:c.sub||null})),
+      idle:"这段进行里有外人吗？"};
+  }else{
+    const pool = PATTERNS.filter(p=>p.lv <= level.lv);
+    const pat = pickAvoid(pool, level.id, x=>x.id);
+    const prog = buildProgression(key, pat.steps);
+    S.q = {kind:"pattern", key, level, pat, pool, events:prog.events, dots:prog.dots, caps:null,
+      answerValue:pat.name,
+      options: pool.map(p=>({value:p.name, label:p.name, sub:p.degText})),
+      idle:"这是哪个套路？"};
+  }
+}
+function playCurrent(slow){
+  const q = S.q; if(!q) return;
+  const bpm = (S.data.settings.bpm || 100) * (slow ? 0.72 : 1);
+  const marks = [];
+  (q.caps||[]).forEach(c=> marks.push({t:c.t, fn:()=> setCaption(c.text)}));
+  (q.dots||[]).forEach(d=> marks.push({t:d.t, fn:()=> setDot(d.i)}));
+  AE.play(q.events, {bpm, marks, onEnd:()=>{ setCaption(q.idle); clearDots(); }});
+  if(q.caps && q.caps.length) setCaption(q.caps[0].text); else setCaption("播放中…");
+}
+function playAdhoc(events, caps, bpm){
+  const marks = (caps||[]).map(c=>({t:c.t, fn:()=> setCaption(c.text)}));
+  AE.play(events, {bpm: bpm || S.data.settings.bpm || 100, marks, onEnd:()=> setCaption(S.q ? S.q.idle : "")});
+}
+
+/* ---------------- 作答与讲解 ---------------- */
+function submitAnswer(i){
+  const q = S.q; if(!q || S.answered) return;
+  const opt = q.options[i]; if(!opt) return;
+  S.chosenIdx = i;
+  const correctLabel = q.options.find(o=>o.value===q.answerValue).label;
+  const ok = recordAnswer(q.level.id, correctLabel, opt.label);
+  S.answered = true;
+  S.feedback = buildFeedback(q, opt, ok);
+  render();
+}
+function buildFeedback(q, chosen, ok){
+  const f = {ok, actions:[]};
+  const key = q.key;
+  if(q.kind === "root"){
+    const d = DEGREES[q.answerValue];
+    f.title = ok ? "答对了，是 " + d.label : "是 " + d.label + "，你选了 " + chosen.label;
+    const tb0 = bassTonic(key.pc);
+    const p0 = q.answerValue === "1" ? tb0 : foldBass(tb0 + nearestSemi(d.semi));
+    const octNote = q.bassNote === p0 ? "" : (q.bassNote > p0 ? "（高八度）" : "（低八度）");
+    let det = "低音是 <b>" + noteNameOct(q.bassNote) + "</b>" + octNote + "（" + key.name + " 大调的 " + d.label + " 级，和弦 " +
+      chordNameForDegree(key, q.answerValue) + "）。" + d.color + "。";
+    if(q.answerValue === "1")
+      det += "<br>这个 1 和定调的 1 不在同一个八度：音高变了，级数身份没变。";
+    if(!ok){
+      const pair = [q.answerValue, chosen.value];
+      if(pair.includes("1") && pair.includes("6m"))
+        det += "<br>窍门：1 和 6m 共享两个音，最容易混。听低音落点：<b>亮的家是 1，暗的家是 6m</b>。";
+      if(pair.includes("4") && pair.includes("2m"))
+        det += "<br>窍门：4 和 2m 同为下属功能，色彩相近。2m 更柔更暗，4 更亮更开阔。";
+    }
+    f.detail = det;
+    f.actions.push({act:"listen-correct", label:"听正确答案"});
+    if(!ok) f.actions.push({act:"listen-chosen", label:"听你选的 " + chosen.label});
+  }else if(q.kind === "seq"){
+    f.title = ok ? "答对了" : "正确走向：" + q.answerValue;
+    f.detail = "<b>" + q.answerValue + "</b>，低音走的是 " +
+      q.bassLineNotes.map(noteName).join(" → ") + "（" + key.name + " 大调）。" + esc(q.sp.note) + "。";
+    f.actions.push({act:"replay", label:"再听一遍"});
+    if(!ok) f.actions.push({act:"listen-chosen-seq", label:"听你选的走向"});
+  }else if(q.kind === "quality"){
+    const info = QUALITY_INFO[q.answerValue];
+    const nm = q.qNum===1 ? (q.answerValue==="maj"?"大三度":"小三度") : info.label;
+    f.title = ok ? "答对了，是" + nm : "是" + nm + "，你选了" + chosen.label;
+    f.detail = "根音 <b>" + noteName(q.root) + "</b>。" + info.feel + "。" +
+      (q.answerValue==="dom7" ? "属七 = 大三度加小七度，躁感来自那个小七度。" : "");
+    if(!ok){
+      f.actions.push({act:"compare", label:"对比听：你选的 → 正确的"});
+    }else if(q.level.pool.length === 2){
+      f.actions.push({act:"compare-other", label:"对比听另一种"});
+    }else{
+      f.actions.push({act:"replay", label:"再听一遍"});
+    }
+  }else if(q.kind === "cadence"){
+    f.title = ok ? "答对了：" + q.cat.label : "是" + q.cat.label + "，你选了「" + chosen.label + "」";
+    let det = "进行：<b>" + q.seq.join("　") + "</b>（" + key.name + " 大调：" +
+      patternChordNames(key, {steps: seqToSteps(q.seq)}) + "）<br>" + esc(q.cat.why);
+    const pair = [q.answerValue, chosen.value];
+    if(!ok && pair.includes("auth") && pair.includes("dec6"))
+      det += "<br>窍门：都在「回家」，但正格回的是亮的家 1，伪终止进的是暗的家 6m。只听最后一个和弦的亮暗。";
+    if(!ok && pair.includes("half"))
+      det += "<br>窍门：半终止的落点是悬着发紧的（想继续走），终止类的落点是松下来的（走完了）。";
+    f.detail = det;
+    f.actions.push({act:"replay", label:"再听一遍"});
+    if(!ok) f.actions.push({act:"listen-cad-chosen", label:"对比听：你选的 → 正确的"});
+  }else if(q.kind === "outside"){
+    const it = q.item;
+    const catLabel = OUTSIDE_CATS.find(c=>c.value === it.cat).label;
+    f.title = ok ? "答对了：" + catLabel : "是「" + catLabel + "」，你选了「" + chosen.label + "」";
+    f.detail = "进行：<b>" + it.seq.join("　") + "</b>（" + key.name + " 大调：" +
+      patternChordNames(key, {steps: seqToSteps(it.seq)}) + "）<br>" +
+      (it.outsider ? "外人是 <b>" + it.outsider + "</b>。" : "") + esc(it.why) +
+      "<br><span class='muted'>" + OUTSIDE_RULE[it.cat] + "</span>";
+    f.actions.push({act:"replay", label:"再听一遍"});
+    if(it.twin) f.actions.push({act:"listen-twin", label:"A/B 对比：全调内版 → 原版"});
+  }else{
+    const pat = q.pat;
+    f.title = ok ? "答对了，是" + pat.name : "是" + pat.name + "，你选了" + chosen.label;
+    let det = "<b>" + pat.degText + "</b>（" + key.name + " 大调：" + patternChordNames(key, pat) + "）<br>" + esc(pat.hint);
+    if(q.kind === "variant"){
+      det += "<br>这遍的变奏：" + VARIANT_DESC[q.vopts.bassStyle] +
+        (q.vopts.seventh ? "，和弦全部加了七音" : "") + "。伴奏怎么换，套路的轮廓不变。";
+    }
+    if(!ok){
+      const wrongPat = PATTERNS.find(p=>p.name === chosen.value);
+      det += "<br>窍门：" + esc(pat.trick);
+      if(wrongPat) f.actions.push({act: q.kind === "variant" ? "listen-chosen-var" : "listen-chosen-pat", label:"听你选的" + wrongPat.name});
+    }
+    const anchor = S.data.anchors[pat.id];
+    det += anchor ? "<br>你的锚点歌：" + esc(anchor) : "<br><span class='muted'>还没设锚点歌，去本模式首页的套路图鉴里给它配 3 首熟悉的歌。</span>";
+    f.detail = det;
+    f.actions.unshift({act: q.kind === "variant" ? "listen-correct-var" : "listen-correct-pat", label:"再听" + pat.name});
+  }
+  return f;
+}
+function runFeedbackAction(act){
+  const q = S.q; if(!q) return;
+  if(act === "replay"){ playCurrent(false); return; }
+  if(act === "replay-slow"){ playCurrent(true); return; }
+  if(q.kind === "root"){
+    const deg = act === "listen-correct" ? q.answerValue : q.options[S.chosenIdx].value;
+    let bn;
+    if(act === "listen-correct"){ bn = q.bassNote; }
+    else{
+      // 你选的级数放在离目标音最近的八度，把差异集中在级数身份上
+      const cands = degCandidates(deg, q.key, true);
+      bn = cands.reduce((a,b)=> Math.abs(b-q.bassNote) < Math.abs(a-q.bassNote) ? b : a);
+    }
+    const b = buildRootQuestion(q.key, deg, bn);
+    playAdhoc(b.events, [{t:0, text:"定调：1 级"}, {t:2.5, text:DEGREES[deg].label + "（" + noteNameOct(bn) + "，和弦 " + chordNameForDegree(q.key, deg) + "）"}]);
+  }else if(q.kind === "seq" && act === "listen-chosen-seq"){
+    const seq = q.options[S.chosenIdx].value.split(" → ");
+    const prog = buildProgression(q.key, seqToSteps(seq), 2);
+    playAdhoc(prog.events, [{t:0, text:"你选的：" + q.options[S.chosenIdx].value}]);
+  }else if(q.kind === "quality"){
+    const other = q.level.pool.find(p=>p !== q.answerValue);
+    const a = act === "compare" ? q.options[S.chosenIdx].value : (act === "compare-other" ? other : q.answerValue);
+    const lab = v => q.qNum===1 ? (v==="maj"?"大三度":"小三度") : QUALITY_INFO[v].label;
+    playAdhoc(qualityCompareEvents(q.root, a, q.answerValue, q.qNum),
+      [{t:0, text:"① " + lab(a)}, {t:3.6, text:"② " + lab(q.answerValue) + "（正确）"}]);
+  }else if(q.kind === "pattern"){
+    const pat = act === "listen-correct-pat" ? q.pat : PATTERNS.find(p=>p.name === q.options[S.chosenIdx].value);
+    if(!pat) return;
+    const prog = buildProgression(q.key, pat.steps);
+    playAdhoc(prog.events, [{t:0, text:pat.name + "：" + pat.degText}]);
+  }else if(q.kind === "variant"){
+    const pat = act === "listen-correct-var" ? q.pat : PATTERNS.find(p=>p.name === q.options[S.chosenIdx].value);
+    if(!pat) return;
+    const prog = buildProgression(q.key, pat.steps, null, q.vopts);
+    playAdhoc(prog.events, [{t:0, text:pat.name + "（同样的变奏）：" + pat.degText}]);
+  }else if(q.kind === "cadence" && act === "listen-cad-chosen"){
+    const chosenCat = CADENCE_POOL.find(c=>c.cat === q.options[S.chosenIdx].value);
+    if(!chosenCat) return;
+    const ab = concatProgs([
+      {prog: buildProgression(q.key, seqToSteps(chosenCat.seqs[0]), 1), cap:"① 你选的：" + chosenCat.label},
+      {prog: buildProgression(q.key, seqToSteps(q.seq), 1), cap:"② 正确：" + q.cat.label}
+    ]);
+    playAdhoc(ab.events, ab.caps);
+  }else if(q.kind === "outside" && act === "listen-twin"){
+    const ab = concatProgs([
+      {prog: buildProgression(q.key, seqToSteps(q.item.twin), 1), cap:"① 全调内版本"},
+      {prog: buildProgression(q.key, seqToSteps(q.item.seq), 1), cap:"② 原版（外人：" + q.item.outsider + "）"}
+    ]);
+    playAdhoc(ab.events, ab.caps);
+  }
+}
+
+/* ================================================================
+   各屏渲染
+   ================================================================ */
+function levelMeterHtml(mode, level){
+  const st = levelStat(level.id);
+  const r = recent20Rate(st);
+  const w = r === null ? 0 : Math.round(r*100);
+  return '<div class="meter-wrap"><div class="meter-label"><span>近 ' + Math.min(st.recent.length||0, PASS_N) + ' 题正确率</span><span>' +
+    (r===null ? "还没练过" : pct(r) + " · 共 " + st.a + " 题") + '</span></div>' +
+    '<div class="meter ' + mode.meterCls + '"><i style="width:' + w + '%"></i></div></div>';
+}
+function renderTopbar(){
+  const day = S.data.days[todayStr()];
+  const n = day ? day.n : 0;
+  let left;
+  if(S.screen === "home"){
+    left = '<div class="title-wrap"><h1>J-Rock 练耳训练器</h1><div class="subtitle">对应《Bassline 学习方法论》第三部分 · 阶段 0 到 3 · Bass 手专用</div></div>';
+  }else{
+    const names = {warmup:"阶段 0 · 唱级数热身", progress:"进度", mode:"", quiz:""};
+    let t = names[S.screen];
+    if(S.screen === "mode") t = MODES[S.modeKey].stage + " · " + MODES[S.modeKey].name;
+    if(S.screen === "quiz") t = MODES[S.modeKey].name + " · " + MODES[S.modeKey].levels[S.levelIdx].name.replace(/^档 \d+ · /,"");
+    left = '<button class="backbtn" data-act="back">← 返回</button><div class="title-wrap"><h2 style="margin:0">' + t + '</h2></div>';
+  }
+  return '<div class="topbar">' + left + '<span class="pill">今日 <b>' + n + '</b> 题</span></div>';
+}
+function renderHome(){
+  const st = S.data.settings;
+  let h = '<div class="settings-row card" style="padding:12px 14px">' +
+    '<label>调 <select data-set="key"' + (st.random?" disabled":"") + '>' +
+      KEYS.map(k=>'<option value="'+k.name+'"'+(st.key===k.name?" selected":"")+'>'+k.name+' 大调</option>').join("") +
+    '</select></label>' +
+    '<label><input type="checkbox" data-set="random"' + (st.random?" checked":"") + '> 每题随机调</label>' +
+    '<label>速度 <select data-set="bpm">' +
+      [["80","慢"],["100","标准"],["120","快"]].map(([v,l])=>'<option value="'+v+'"'+(String(st.bpm)===v?" selected":"")+'>'+l+' '+v+'</option>').join("") +
+    '</select></label>' +
+    '<label>和弦音色 <select data-set="cvoice">' +
+      [["gtr","电吉他"],["ep","键盘"]].map(([v,l])=>'<option value="'+v+'"'+((st.chordVoice||"gtr")===v?" selected":"")+'>'+l+'</option>').join("") +
+    '</select></label>' +
+    '<label>音量 <input type="range" min="0" max="1" step="0.05" value="' + st.vol + '" data-set="vol" style="width:90px"></label>' +
+  '</div>';
+  h += '<button class="mode-card" data-act="nav-warmup" style="--tag-c:var(--accent-warm)">' +
+    '<div class="mode-head"><span class="stage-tag">阶段 0</span><h2>唱级数热身</h2></div>' +
+    '<div class="desc">先会唱，才会听。对着 drone 唱数字，每次开练前 2 到 3 分钟，永久保留。</div></button>';
+  for(const mk of ["root","quality","pattern"]){
+    const m = MODES[mk];
+    const dots = m.levels.map((lv,i)=>{
+      const stt = levelStat(lv.id);
+      return '<span class="lv-dot' + (stt.passed?" passed":"") + '">档' + (i+1) + (stt.passed?" ✓":"") + '</span>';
+    }).join("");
+    h += '<button class="mode-card" data-act="nav-mode" data-mode="' + mk + '" style="--tag-c:' + m.cssColor + '">' +
+      '<div class="mode-head"><span class="stage-tag">' + m.stage + '</span><h2>' + m.name + '</h2></div>' +
+      '<div class="desc">' + m.desc + '</div><div class="lv-dots">' + dots + '</div></button>';
+  }
+  h += '<button class="mode-card" data-act="nav-progress" style="--tag-c:var(--ink-3)">' +
+    '<div class="mode-head"><span class="stage-tag">记录</span><h2>进度与数据</h2></div>' +
+    '<div class="desc">每日题量、各档正确率、最常混淆的听错组合、数据导出。</div></button>';
+  h += '<div class="note-box">每天 10 到 15 分钟，远胜周末突击 2 小时。顺序建议：热身唱 2 分钟 → 当前主攻档位 10 分钟 → 性质听辨 2 分钟。每档过关线：近 ' + PASS_N + ' 题正确率 ' + pct(PASS_RATE) + '。</div>';
+  return h;
+}
+function renderMode(){
+  const m = MODES[S.modeKey];
+  let h = '<div class="card" style="margin-bottom:12px"><div class="sub small">' + m.desc + '</div></div>';
+  const firstUnpassed = m.levels.findIndex(lv=>!levelStat(lv.id).passed);
+  h += m.levels.map((lv,i)=>{
+    const st = levelStat(lv.id);
+    return '<button class="level-btn" data-act="open-level" data-i="' + i + '">' +
+      '<span class="lv-name">' + lv.name + '</span>' +
+      (st.passed ? '<span class="badge-pass">已过关 ' + (st.passedOn||"") + '</span>' : (i === firstUnpassed ? '<span class="badge-rec">当前推荐</span>' : "")) +
+      '<div class="lv-goal">' + lv.goal + '</div>' + levelMeterHtml(m, lv) + '</button>';
+  }).join("");
+  if(S.modeKey === "root"){
+    const key = S.data.settings.random ? KEYS.find(k=>k.name==="E") : (KEYS.find(k=>k.name===S.data.settings.key)||KEYS[2]);
+    h += '<hr class="divider"><h3>先熟悉声音（' + key.name + ' 大调）</h3><div class="sub small" style="margin-bottom:8px">先知道答案再练耳朵，是学习；上来就盲猜，是挫败感生成器。点着听几遍再进档位。</div><div class="opts narrow">' +
+      ["1","2m","3m","4","5","6m"].map(d=>'<button class="opt" style="padding:10px" data-act="preview-deg" data-deg="' + d + '">' + d +
+        '<span class="opt-sub">' + chordNameForDegree(key,d) + '</span></button>').join("") + '</div>';
+  }
+  if(S.modeKey === "quality"){
+    h += '<hr class="divider"><h3>先熟悉五种颜色</h3><div class="sub small" style="margin-bottom:8px">在自己 bass 上也弹一遍：弹完唱，唱完听。</div><div class="opts narrow">' +
+      [["maj","大三和弦","亮、开阔"],["min","小三和弦","暗、收拢"],["dom7","属七和弦","亮但躁"],["maj7","大七和弦","亮但飘"],["min7","小七和弦","暗但松弛"]].map(([v,l,s])=>
+        '<button class="opt" style="padding:10px;font-size:15px" data-act="preview-q" data-q="' + v + '">' + l +
+        '<span class="opt-sub">' + s + '</span></button>').join("") + '</div>';
+  }
+  if(S.modeKey === "pattern"){
+    h += '<hr class="divider"><h3>套路图鉴</h3><div class="sub small" style="margin-bottom:8px">给每个套路配 3 首你熟的锚点歌，反复对照听。以后听到新歌先条件反射「是不是王道」，再核对细节。</div>';
+    h += PATTERNS.map(p=>{
+      return '<div class="dex-item"><div class="row">' +
+        '<button class="playmini" data-act="dex-play" data-id="' + p.id + '">▶</button>' +
+        '<div class="grow"><span class="deg">' + p.name + '</span> <span class="muted small">' + p.degText + '</span>' +
+        '<div class="hint">' + esc(p.hint) + '</div></div></div>' +
+        '<div class="anchor-row"><span class="tiny muted" style="flex:none">锚点歌</span>' +
+        '<input type="text" placeholder="写下 3 首你熟的、用这个套路的歌" value="' + esc(S.data.anchors[p.id]||"") + '" data-set="anchor" data-id="' + p.id + '"></div></div>';
+    }).join("");
+  }
+  return h;
+}
+function renderQuiz(){
+  const m = MODES[S.modeKey], level = m.levels[S.levelIdx], q = S.q;
+  const st = levelStat(level.id);
+  const r = recent20Rate(st);
+  let h = '<div class="quiz-head"><span class="small muted">' + level.name + '</span>' +
+    '<div class="quiz-stats"><span>近' + PASS_N + ' <b>' + (r===null?"–":pct(r)) + '</b></span>' +
+    '<span>连对 <b>' + st.streak + '</b></span><span>本档 <b>' + st.c + "/" + st.a + '</b></span>' +
+    (st.passed ? '<span style="color:var(--good)">✓ 已过关</span>' : "") + '</div></div>';
+  const dotN = q.dots ? q.dots.length : 0;
+  h += '<div class="playzone" style="--mode-c:' + m.cssColor + '">' +
+    '<button class="bigplay' + (S.playing?" playing":"") + '" id="bigplayBtn" data-act="replay" title="再听一遍（空格）">▶</button>' +
+    '<div class="beat-dots" id="beatDots">' + Array.from({length:dotN},()=>'<span class="beat-dot"></span>').join("") + '</div>' +
+    '<div class="play-caption" id="playCaption">' + q.idle + '</div>' +
+    '<div class="replay-row"><button data-act="replay">再听 <span class="kbd">空格</span></button>' +
+    '<button data-act="replay-slow">慢速再听</button></div></div>';
+  const st2 = S.data.settings;
+  const showCv = !(q.kind === "quality" && q.qNum === 1);
+  const showMix = (q.kind !== "quality" && q.kind !== "variant");
+  const showHi = q.kind === "root";
+  if(showCv || showMix || showHi){
+    h += '<div class="row small" style="justify-content:center;gap:16px;margin:-4px 0 12px;color:var(--ink-3)">' +
+      (showCv ? '<label style="display:flex;align-items:center;gap:5px">和弦音色 <select data-set="cvoice" style="padding:3px 6px;font-size:12.5px">' +
+        [["gtr","电吉他"],["ep","键盘"]].map(([v,l])=>'<option value="'+v+'"'+((st2.chordVoice||"gtr")===v?" selected":"")+'>'+l+'</option>').join("") + '</select></label>' : "") +
+      (showMix ? '<label title="每题随机换一个大调" style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-set="random"'+(st2.random?" checked":"")+'> 打混调</label>' : "") +
+      (showHi ? '<label title="目标音在当前、高、低三个八度里随机出现" style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-set="hioct"'+(st2.rootHighOct?" checked":"")+'> 高八度</label>' : "") +
+      ((showMix || showHi) ? '<span class="tiny">改动下一题生效</span>' : "") +
+    '</div>';
+  }
+  const narrow = q.kind === "root" || q.kind === "quality";
+  h += '<div class="opts' + (narrow?" narrow":"") + '">' + q.options.map((o,i)=>{
+    let cls = "opt";
+    if(S.answered){
+      if(o.value === q.answerValue) cls += " correct";
+      else if(i === S.chosenIdx) cls += " wrong";
+      else cls += " dim";
+    }
+    const fs = (q.kind === "seq" || q.kind === "cadence" || q.kind === "outside") ? "font-size:14.5px;"
+             : ((q.kind === "pattern" || q.kind === "variant") ? "font-size:15px;" : "");
+    return '<button class="' + cls + '" style="' + fs + '" data-act="answer" data-i="' + i + '"' + (S.answered?" disabled":"") + '>' +
+      '<span class="key-hint">' + (i+1) + '</span>' + esc(o.label) +
+      (o.sub ? '<span class="opt-sub">' + esc(o.sub) + '</span>' : "") + '</button>';
+  }).join("") + '</div>';
+  if(S.answered && S.feedback){
+    const f = S.feedback;
+    h += '<div class="feedback ' + (f.ok?"ok":"no") + '" style="--mode-c:' + m.cssColor + '">' +
+      '<div class="fb-title">' + (f.ok?"✓ ":"✕ ") + esc(f.title) + '</div>' +
+      '<div class="fb-detail">' + f.detail + '</div>' +
+      '<div class="fb-actions">' + f.actions.map(a=>'<button data-act="fb" data-fb="' + a.act + '">' + esc(a.label) + '</button>').join("") +
+      '<button class="next" data-act="next">下一题 <span class="kbd" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.35)">回车</span></button></div></div>';
+  }
+  h += '<div class="tiny muted" style="text-align:center">键盘：数字选答案 · 空格再听 · 回车下一题 · Esc 返回</div>';
+  return h;
+}
+function renderWarmup(){
+  const st = S.data.settings;
+  const key = KEYS.find(k=>k.name===st.key) || KEYS[2];
+  const tonic3 = 48 + key.pc;
+  let h = '<div class="card" style="margin-bottom:12px"><div class="sub small">' +
+    '放着 drone，对它唱<b>数字</b>：先唱再弹确认，唱不准的音程永远听不出来。前期一半时间在唱，不在听。<br>' +
+    '过关标准：不看琴，能对着 drone 稳定唱准 1、3、4、5、6 之间的任意跳进。</div></div>';
+  h += '<div class="drone-row"><button class="playmini" style="width:auto;padding:0 16px;border-radius:10px" data-act="drone">' +
+    (S.droneOn ? "■ 停止 Drone" : "▶ 播放 Drone") + '</button>' +
+    '<div class="grow small sub">持续音 <b>' + key.name + '</b>（在首页可换调）</div></div>';
+  h += WARMUP_PATTERNS.map((p,i)=>{
+    const segs = p.degs.map((d,j)=>'<span data-warm="' + i + '-' + j + '">' + (d===8?"1":(d<0?"低"+(-d):d)) + '</span>').join(" ");
+    return '<div class="pattern-row"><button class="playmini" data-act="warm-play" data-i="' + i + '">▶</button>' +
+      '<div class="grow"><div class="deg-seq" id="warmseq-' + i + '">' + segs + '</div>' +
+      '<div class="why">' + p.name + ' · ' + p.why + '</div></div></div>';
+  }).join("");
+  h += '<div class="note-box" style="margin-top:12px">琴和嗓子互相校准：弹一个音接着唱出来；先唱一个音再在琴上找到它。这一页的参考音在 ' +
+    key.name + '3 附近，觉得高就低八度唱。</div>';
+  return h;
+}
+function renderProgress(){
+  const days = S.data.days;
+  const today = days[todayStr()] || {n:0,c:0};
+  let totN = 0, totC = 0;
+  Object.values(days).forEach(d=>{ totN += d.n; totC += d.c; });
+  let h = '<div class="tiles">' +
+    '<div class="tile"><div class="t-label">今日题数</div><div class="t-value">' + today.n + '</div><div class="t-note">' + (today.n?("正确率 " + pct(today.c/today.n)):"还没开始") + '</div></div>' +
+    '<div class="tile"><div class="t-label">连续练习</div><div class="t-value">' + dayStreak() + '<span style="font-size:14px"> 天</span></div><div class="t-note">每天 10 到 15 分钟就算数</div></div>' +
+    '<div class="tile"><div class="t-label">累计题数</div><div class="t-value">' + totN + '</div><div class="t-note">' + Object.keys(days).length + ' 个练习日</div></div>' +
+    '<div class="tile"><div class="t-label">总正确率</div><div class="t-value">' + (totN?pct(totC/totN):"–") + '</div><div class="t-note">过关线 ' + pct(PASS_RATE) + '</div></div></div>';
+  for(const mk of ["root","quality","pattern"]){
+    const m = MODES[mk];
+    h += '<div class="prog-section card" style="margin-bottom:12px"><h3>' + m.stage + ' · ' + m.name + '</h3>' +
+      m.levels.map(lv=>{
+        const st = levelStat(lv.id);
+        return '<div style="margin-top:10px"><div class="small sub">' + lv.name +
+          (st.passed?' <span class="badge-pass">已过关</span>':"") +
+          ' <span class="tiny muted">最长连对 ' + st.best + '</span></div>' + levelMeterHtml(m, lv) + '</div>';
+      }).join("") + '</div>';
+  }
+  const confRows = [];
+  const secName = {root:"根音", q:"性质", p:"套路"};
+  Object.entries(S.data.conf).forEach(([sec,map])=>{
+    Object.entries(map).forEach(([k,v])=> confRows.push({sec:secName[sec]||sec, k, v}));
+  });
+  confRows.sort((a,b)=>b.v-a.v);
+  h += '<div class="prog-section card"><h3>最常混淆</h3>';
+  h += confRows.length ? confRows.slice(0,6).map(r=>'<div class="conf-item"><span>' + r.sec + '：把 ' + esc(r.k) + '</span><span class="muted">' + r.v + ' 次</span></div>').join("")
+    : '<div class="small muted">还没有听错记录。</div>';
+  h += '</div>';
+  h += '<div class="prog-section card"><h3>数据</h3><div class="small muted" style="margin:6px 0 10px">' +
+    (store.ok ? "进度自动保存在这台设备的浏览器里。换设备时用导出/导入迁移。"
+              : "当前打开方式不支持自动保存（比如在 Claude 侧边栏里）。进度只在本次打开期间有效，练完记得点「导出」把这段文本存下来；下次打开粘贴回来再「导入」。双击打开 BassLearning 文件夹里的这个 html 文件（用浏览器）就能自动长期保存。") +
+    '</div><div class="row" style="margin-bottom:8px">' +
+    '<button data-act="export">导出到文本框</button><button data-act="import">从文本框导入</button>' +
+    '<button data-act="reset" style="color:var(--bad)">' + (S.resetArmed?"再点一次确认清空":"清空全部进度") + '</button></div>' +
+    '<textarea id="ioArea" placeholder="导出的进度会出现在这里；导入时把之前导出的文本粘贴到这里">' + esc(S.ioText) + '</textarea>' +
+    (S.ioMsg ? '<div class="small" style="margin-top:6px;color:var(--accent)">' + esc(S.ioMsg) + '</div>' : "") + '</div>';
+  return h;
+}
+function render(){
+  const el = document.getElementById("app");
+  let body = "";
+  switch(S.screen){
+    case "home": body = renderHome(); break;
+    case "mode": body = renderMode(); break;
+    case "quiz": body = renderQuiz(); break;
+    case "warmup": body = renderWarmup(); break;
+    case "progress": body = renderProgress(); break;
+  }
+  el.innerHTML = renderTopbar() + body;
+}
+
+/* ================================================================
+   事件
+   ================================================================ */
+function goBack(){
+  AE.stopAll();
+  S.droneOn = false;
+  if(S.screen === "quiz"){ S.screen = "mode"; }
+  else { S.screen = "home"; }
+  S.q = null; S.answered = false; S.ioMsg = ""; S.resetArmed = false;
+  render();
+}
+document.addEventListener("click", e=>{
+  const btn = e.target.closest("[data-act]");
+  if(!btn) return;
+  const act = btn.dataset.act;
+  if(act === "back"){ goBack(); return; }
+  if(act === "nav-mode"){ AE.stopAll(); S.modeKey = btn.dataset.mode; S.screen = "mode"; render(); return; }
+  if(act === "nav-warmup"){ S.screen = "warmup"; render(); return; }
+  if(act === "nav-progress"){ S.screen = "progress"; S.ioText=""; S.ioMsg=""; render(); return; }
+  if(act === "open-level"){
+    S.levelIdx = parseInt(btn.dataset.i,10); S.screen = "quiz";
+    AE.ensure(); genQuestion(); render(); playCurrent(false); return;
+  }
+  if(act === "answer"){ submitAnswer(parseInt(btn.dataset.i,10)); return; }
+  if(act === "next"){ AE.ensure(); genQuestion(); render(); playCurrent(false); return; }
+  if(act === "replay"){ AE.ensure(); playCurrent(false); return; }
+  if(act === "replay-slow"){ AE.ensure(); playCurrent(true); return; }
+  if(act === "fb"){ AE.ensure(); runFeedbackAction(btn.dataset.fb); return; }
+  if(act === "preview-deg"){
+    AE.ensure();
+    const key = S.data.settings.random ? KEYS.find(k=>k.name==="E") : (KEYS.find(k=>k.name===S.data.settings.key)||KEYS[2]);
+    const b = buildRootQuestion(key, btn.dataset.deg);
+    AE.play(b.events.filter(ev=>ev.t>=2.4).map(ev=>({...ev, t:ev.t-2.5})), {bpm:S.data.settings.bpm});
+    return;
+  }
+  if(act === "preview-q"){
+    AE.ensure();
+    const b = buildQualityQuestion(2, btn.dataset.q);
+    AE.play(b.events, {bpm:S.data.settings.bpm}); return;
+  }
+  if(act === "dex-play"){
+    AE.ensure();
+    const pat = PATTERNS.find(p=>p.id === btn.dataset.id);
+    const key = S.data.settings.random ? KEYS.find(k=>k.name==="E") : (KEYS.find(k=>k.name===S.data.settings.key)||KEYS[2]);
+    const prog = buildProgression(key, pat.steps);
+    AE.play(prog.events, {bpm:S.data.settings.bpm}); return;
+  }
+  if(act === "drone"){
+    AE.ensure();
+    const key = KEYS.find(k=>k.name===S.data.settings.key) || KEYS[2];
+    const tonic3 = 48 + key.pc;
+    S.droneOn = AE.toggleDrone(tonic3-24, tonic3-12);
+    render(); return;
+  }
+  if(act === "warm-play"){
+    AE.ensure();
+    const i = parseInt(btn.dataset.i,10);
+    const key = KEYS.find(k=>k.name===S.data.settings.key) || KEYS[2];
+    const tonic3 = 48 + key.pc;
+    const p = WARMUP_PATTERNS[i];
+    const ev = [], marks = [];
+    p.degs.forEach((d,j)=>{
+      const semi = d===8 ? 12 : (d<0 ? MAJOR_SCALE[(-d)-1]-12 : MAJOR_SCALE[d-1]);
+      ev.push({t:j, dur:0.92, midi:tonic3+semi, voice:"tone", vel:0.9});
+      marks.push({t:j, fn:()=>{
+        document.querySelectorAll('#warmseq-'+i+' span').forEach((s,k)=> s.classList.toggle("cur", k===j));
+      }});
+    });
+    AE.play(ev, {bpm:66, marks, onEnd:()=> document.querySelectorAll('#warmseq-'+i+' span').forEach(s=>s.classList.remove("cur"))});
+    return;
+  }
+  if(act === "export"){
+    S.ioText = JSON.stringify(S.data); S.ioMsg = "已导出，全选复制保存到备忘录即可。"; render(); return;
+  }
+  if(act === "import"){
+    const ta = document.getElementById("ioArea");
+    try{
+      const d = JSON.parse(ta.value);
+      if(!d || typeof d !== "object" || !d.v) throw new Error("bad");
+      S.data = Object.assign(defaultData(), d, {settings:Object.assign(defaultData().settings, d.settings||{})});
+      saveData(); S.ioText = ta.value; S.ioMsg = "导入成功。"; render();
+    }catch(err){ S.ioText = ta.value; S.ioMsg = "导入失败：这段文本不是有效的进度数据。"; render(); }
+    return;
+  }
+  if(act === "reset"){
+    if(!S.resetArmed){ S.resetArmed = true; render(); setTimeout(()=>{ if(S.resetArmed){ S.resetArmed=false; if(S.screen==="progress") render(); } }, 3000); }
+    else { const st = S.data.settings; S.data = defaultData(); S.data.settings = st; saveData(); S.resetArmed = false; S.ioText=""; S.ioMsg="已清空。"; render(); }
+    return;
+  }
+});
+document.addEventListener("change", e=>{
+  const el = e.target.closest("[data-set]");
+  if(!el) return;
+  const st = S.data.settings;
+  switch(el.dataset.set){
+    case "key": st.key = el.value; break;
+    case "random": st.random = el.checked; break;
+    case "bpm": st.bpm = parseInt(el.value,10); break;
+    case "cvoice": st.chordVoice = el.value; break;
+    case "hioct": st.rootHighOct = el.checked; break;
+    case "vol": st.vol = parseFloat(el.value); AE.setVol(st.vol); break;
+    case "anchor": S.data.anchors[el.dataset.id] = el.value.trim(); break;
+  }
+  saveData();
+  if(el.dataset.set === "key" || el.dataset.set === "random") render();
+});
+document.addEventListener("keydown", e=>{
+  if(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+  if(S.screen !== "quiz"){ if(e.key === "Escape" && S.screen !== "home") goBack(); return; }
+  if(e.key === "Escape"){ goBack(); return; }
+  if(e.key === " "){ e.preventDefault(); AE.ensure(); playCurrent(false); return; }
+  if(e.key === "Enter"){ if(S.answered){ AE.ensure(); genQuestion(); render(); playCurrent(false); } return; }
+  const n = parseInt(e.key,10);
+  if(!isNaN(n) && n >= 1 && S.q && n <= S.q.options.length && !S.answered){ submitAnswer(n-1); }
+});
+render();
+
+</script>
+</body>
+</html>
