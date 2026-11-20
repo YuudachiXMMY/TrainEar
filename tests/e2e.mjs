@@ -141,6 +141,51 @@ await step("fretboard degree mode: 5 levels judge right and wrong", async () => 
   await page.click('[data-act="back"]');
 });
 
+// ---- 音名地形 + 模进训练：每档一对一错 ----
+await step("board + motif modes judge right and wrong", async () => {
+  // 正确作答：按题型算出该点的格子；错误作答：点一个肯定不对的格子
+  const clicksFor = (wantOk) => page.evaluate(w => {
+    const q = S.q, cells = (lo, hi) => cellsIn(q.tun, lo, hi, () => true);
+    if (q.kind === "b-find") { const c = w ? q.targets[0] : cells(q.lo, q.hi).find(c => c.s === q.s && c.midi % 12 !== q.pc); return [c]; }
+    if (q.kind === "b-all") return w ? q.targets : [cells(0, 12).find(c => c.midi % 12 !== q.pc)];
+    if (q.kind === "m-seq") {
+      const win = cells(q.box.lo, q.box.hi);
+      return q.notes.map((m, i) => (w || i < 2) ? win.find(c => c.midi === m) : win.find(c => c.midi !== m)).slice(0, w ? undefined : 3);
+    }
+    return null;
+  }, wantOk);
+  for (const mode of ["board", "motif"]) {
+    await page.click(`[data-act="nav-mode"][data-mode="${mode}"]`);
+    await page.waitForSelector('[data-act="open-level"]');
+    const n = await page.$$eval('[data-act="open-level"]', a => a.length);
+    for (let lv = 0; lv < n; lv++) {
+      await page.click(`[data-act="open-level"][data-i="${lv}"]`);
+      for (const wantOk of [true, false]) {
+        await page.waitForFunction(() => S.q && S.q.fret && !S.answered);
+        const kind = await page.evaluate(() => S.q.kind);
+        if (kind === "b-name") {
+          const i = await page.evaluate(w => { const i = S.q.options.findIndex(o => o.value === S.q.answerValue); return w ? i : (i + 1) % 12; }, wantOk);
+          await page.click(`[data-act="answer"][data-i="${i}"]`);
+        } else {
+          for (const c of await clicksFor(wantOk)) {
+            if (await page.evaluate(() => S.answered)) break;
+            await page.click(`[data-act="fret-cell"][data-s="${c.s}"][data-f="${c.f}"]`);
+          }
+        }
+        await page.waitForSelector(".feedback");
+        const ok = await page.evaluate(() => S.q.result.ok);
+        if (ok !== wantOk) throw new Error(`${mode} 档 ${lv + 1} ${kind}: 期望 ${wantOk} 实际 ${ok}`);
+        await page.keyboard.press("Enter");
+      }
+      await page.click('[data-act="back"]');
+    }
+    await page.click('[data-act="back"]');
+  }
+  const d = await page.evaluate(() => ({ b: S.data.levels["b-4"], m: S.data.levels["m-2"], conf: Object.keys(S.data.conf) }));
+  if (d.b.a !== 2 || d.b.c !== 1 || d.m.a !== 2 || d.m.c !== 1) throw new Error("统计不对 " + JSON.stringify(d));
+  if (!d.conf.includes("b") || !d.conf.includes("m")) throw new Error("混淆没按模式记录 " + d.conf);
+});
+
 // ---- 注册 + 邮箱验证码验证 ----
 await step("register with email verification", async () => {
   await page.click('[data-act="nav-auth"]');

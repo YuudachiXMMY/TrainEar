@@ -96,7 +96,7 @@ function recordAnswer(levelId, correct, chosen, ms){
   day.n++; if(ok) day.c++;
   if(!ok){
     const cf = S.data.conf[levelId.split("-")[0]] || (S.data.conf[levelId.split("-")[0]] = {});
-    const kk = correct + (FRET_LEVEL_IDS.has(levelId) ? " 认成 " : " 听成 ") + chosen;
+    const kk = correct + (isFretLevel(levelId) ? " 认成 " : " 听成 ") + chosen;
     cf[kk] = (cf[kk]||0) + 1;
   }
   saveData();
@@ -221,7 +221,7 @@ function genQuestion(){
   const kind = level.kind;
   const key = keyObj();
   S.answered = false; S.feedback = null; S.chosenIdx = -1;
-  if(S.modeKey === "fret"){ genFretQuestion(); return; }
+  if(isFretMode(S.modeKey)){ genFretQuestion(); return; }
   if(kind === "deg"){
     const t = genDegTarget(level, key);
     const b = buildRootQuestion(key, t.deg, t.midi);
@@ -472,7 +472,7 @@ function renderTopbar(){
     let t = names[S.screen];
     // 手机顶栏只有一行：模式页显示模式名，答题页显示档位名（档号在下面的 quiz-head）
     if(S.screen === "mode") t = MODES[S.modeKey].name;
-    if(S.screen === "quiz") t = MODES[S.modeKey].levels[S.levelIdx].name.replace(/^档 \d+ · /,"");
+    if(S.screen === "quiz") t = MODES[S.modeKey].levels[S.levelIdx].name.replace(/^(档|阶段) \d+ · /,"");
     left = '<button class="backbtn" data-act="back">← 返回</button><div class="title-wrap"><h2 style="margin:0">' + t + '</h2></div>';
   }
   const acct = API.offline ? "" :
@@ -529,7 +529,7 @@ function renderHome(){
   h += '<button class="mode-card" data-act="nav-warmup" style="--tag-c:var(--accent-warm)">' +
     '<div class="mode-head"><span class="stage-tag">阶段 0</span><h2>唱级数热身</h2></div>' +
     '<div class="desc">先会唱，才会听。对着 drone 唱数字，每次开练前 2 到 3 分钟，永久保留。</div></button>';
-  for(const mk of ["root","quality","pattern","fret"]){
+  for(const mk of ["root","quality","pattern","board","fret","motif"]){
     const m = MODES[mk];
     const dots = m.levels.map((lv,i)=>{
       const stt = levelStat(lv.id);
@@ -555,7 +555,7 @@ function renderHome(){
 function renderMode(){
   const m = MODES[S.modeKey];
   let h = '<div class="card" style="margin-bottom:12px"><div class="sub small">' + m.desc + '</div></div>';
-  if(S.modeKey === "fret") h += fretSettingsHtml() + renderFretMap();
+  if(isFretMode(S.modeKey)) h += fretSettingsHtml(S.modeKey) + renderFretMap(S.modeKey);
   const firstUnpassed = m.levels.findIndex(lv=>!levelStat(lv.id).passed);
   h += m.levels.map((lv,i)=>{
     const st = levelStat(lv.id);
@@ -672,7 +672,7 @@ function renderProgress(){
     '<div class="tile"><div class="t-label">连续练习</div><div class="t-value">' + dayStreak() + '<span style="font-size:14px"> 天</span></div><div class="t-note">每天 10 到 15 分钟就算数</div></div>' +
     '<div class="tile"><div class="t-label">累计题数</div><div class="t-value">' + totN + '</div><div class="t-note">' + Object.keys(days).length + ' 个练习日</div></div>' +
     '<div class="tile"><div class="t-label">总正确率</div><div class="t-value">' + (totN?pct(totC/totN):"–") + '</div><div class="t-note">过关线 ' + pct(PASS_RATE) + '</div></div></div>';
-  for(const mk of ["root","quality","pattern","fret"]){
+  for(const mk of ["root","quality","pattern","board","fret","motif"]){
     const m = MODES[mk];
     h += '<div class="prog-section card" style="margin-bottom:12px"><h3>' + m.stage + ' · ' + m.name + '</h3>' +
       m.levels.map(lv=>{
@@ -683,7 +683,7 @@ function renderProgress(){
       }).join("") + '</div>';
   }
   const confRows = [];
-  const secName = {root:"根音", q:"性质", p:"套路", f:"指板"};
+  const secName = {root:"根音", q:"性质", p:"套路", b:"音名", f:"级数定位", m:"模进"};
   Object.entries(S.data.conf).forEach(([sec,map])=>{
     Object.entries(map).forEach(([k,v])=> confRows.push({sec:secName[sec]||sec, k, v}));
   });

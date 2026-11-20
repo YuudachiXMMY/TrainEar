@@ -46,7 +46,7 @@ const INT_LABEL = ["1","♭2","2","♭3","3","4","♭5","5","♭6","6","♭7","7
 const CN_NUM = ["","一","两","三","四","五","六"];
 
 MODES.fret = {
-  key:"fret", stage:"指板", name:"级数定位", cssColor:"var(--accent-fret)", meterCls:"f",
+  key:"fret", stage:"指板 2", name:"级数定位", cssColor:"var(--accent-fret)", meterCls:"f",
   desc:"手和眼的那一半：以 1 为原点，在把位里一眼找到任意级数的根音和和弦音。按你的实际调弦出题，正确率和反应时间都要达标才算过关。",
   levels:[
     {id:"f-1", kind:"find",  name:"档 1 · 报级数找根音", goal:"给一个级数，在把位框里点出它的根音。1 级标出来当原点", rtLimit:3000},
@@ -56,11 +56,19 @@ MODES.fret = {
     {id:"f-5", kind:"mixed", name:"档 5 · 换调平移",     goal:"每题随机调、随机把位，不再标 1：先自己找到 1，再找级数或认级数", rtLimit:4500}
   ]
 };
-const FRET_LEVEL_IDS = new Set(MODES.fret.levels.map(l=>l.id));
+/* 共用指板引擎的模式：音名地形（board，drills.js）、级数定位（fret）、模进训练（motif，drills.js） */
+const FRET_MODE_KEYS = ["board", "fret", "motif"];
+// 扩展题型：kind → {gen(level), click(q, cell, ms), render(q, m)}，由 drills.js 注册
+const FRET_EXT = {};
+function isFretMode(k){ return FRET_MODE_KEYS.includes(k); }
 function levelRtLimit(levelId){
-  const lv = MODES.fret.levels.find(l=>l.id === levelId);
-  return lv ? lv.rtLimit : null;
+  for(const k of FRET_MODE_KEYS){
+    const lv = MODES[k] && MODES[k].levels.find(l=>l.id === levelId);
+    if(lv) return lv.rtLimit;
+  }
+  return null;
 }
+function isFretLevel(levelId){ return levelRtLimit(levelId) !== null; }
 function medianRT(st){
   const a = (st && st.rt || []).filter(x=>x > 0).slice().sort((x,y)=>x-y);
   return a.length ? a[Math.floor(a.length/2)] : null;
@@ -208,7 +216,14 @@ function degSoundEvents(anchorMidi, targetMidi){
           {t:1, dur:1.5, midi:targetMidi, voice:"bass", vel:1}];
 }
 function genFretQuestion(){
-  const level = MODES.fret.levels[S.levelIdx];
+  const level = MODES[S.modeKey].levels[S.levelIdx];
+  const ext = FRET_EXT[level.kind];
+  if(ext){
+    const q = ext.gen(level);
+    Object.assign(q, {fret:true, ext, level, noAutoPlay:true, result:null, options:q.options || [], events:q.events || []});
+    S.q = q; q.t0 = performance.now();
+    return;
+  }
   const tun = fretTuning();
   const mixed = level.kind === "mixed";
   const key = mixed ? pickOther(FRET_KEYS, S.lastQ["f-key"], k=>k.name) : fretKey();
@@ -300,6 +315,13 @@ function fretCellClick(s, f){
   const tun = inQuiz ? q.tun : fretTuning();
   const midi = tun[s] + f;
   if(!inQuiz){ playFretNote(midi); return; }
+  if(q.ext){
+    if(S.answered || q.optionMode){ playFretNote(midi); return; }
+    if(q.enabled && !q.enabled(s, f)) return;
+    playFretNote(midi);
+    q.ext.click(q, {s, f, midi}, performance.now() - q.t0);
+    return;
+  }
   if(S.answered || q.kind === "f-name"){ playFretNote(midi); return; }
   if(f < q.box.lo || f > q.box.hi) return;
   const cell = {s, f, midi};
@@ -357,8 +379,8 @@ function fretSubmitOption(i){
 /* o.from/o.to：只画这一段品（答题时只画把位框前后各 1 品，格子更大、手机不用横向滚动） */
 function fretboardHtml(o){
   const tun = o.tun, n = tun.length, box = o.box, marks = o.marks || {};
-  const from = o.from ?? 0, to = o.to ?? FRET_MAX, win = from > 0 || to < FRET_MAX;
-  let h = '<div class="fb-scroll' + (win ? " win" : "") + '"' + (box && !win ? ' data-lo="' + box.lo + '"' : "") + '>' +
+  const from = o.from ?? 0, to = o.to ?? FRET_MAX, win = (from > 0 || to < FRET_MAX) && !o.wide;
+  let h = '<div class="fb-scroll' + (win ? " win" : "") + (o.wide ? " wide" : "") + '"' + (o.focus !== undefined ? ' data-lo="' + o.focus + '"' : (box && !win && !o.wide ? ' data-lo="' + box.lo + '"' : "")) + '>' +
     '<div class="fb" style="--cols:' + (to - from + 1) + '" role="group" aria-label="指板">';
   for(let s=n-1; s>=0; s--){
     const th = Math.max(1, 3.2 - s*0.5).toFixed(1);
@@ -367,7 +389,7 @@ function fretboardHtml(o){
       const inb = !box || (f >= box.lo && f <= box.hi);
       const mk = marks[s + "-" + f];
       const cls = "fb-cell" + (f === 0 ? " nut" : "") + (box ? (inb ? " inbox" : " outbox") : "");
-      const dis = o.lockOutside && !inb;
+      const dis = (o.lockOutside && !inb) || (o.enabled && !o.enabled(s, f));
       const aria = noteName(tun[s]) + " 弦 " + f + " 品，" + noteNameOct(tun[s] + f) + (mk && mk.label ? "，标记 " + mk.label : "");
       h += '<button class="' + cls + '" data-act="fret-cell" data-s="' + s + '" data-f="' + f + '"' + (dis ? " disabled" : "") +
         ' title="' + noteNameOct(tun[s] + f) + '" aria-label="' + esc(aria) + '">' +
@@ -392,8 +414,9 @@ function degreeMarks(tun, key, lo, hi, opt){
   }
   return marks;
 }
-function fretSettingsHtml(){
+function fretSettingsHtml(modeKey){
   const st = S.data.settings, n = fretStrings();
+  const noKey = modeKey === "board";   // 音名地形与调无关
   const presets = FRET_PRESETS[n];
   const tid = st.fretTuning === "custom" ? "custom" : (presets.find(p=>p.id === st.fretTuning) || presets[0]).id;
   let h = '<div class="settings-row card" style="padding:12px 14px;flex-direction:column;align-items:stretch;gap:10px">' +
@@ -405,9 +428,10 @@ function fretSettingsHtml(){
       presets.map(p=>'<option value="' + p.id + '"' + (tid === p.id ? " selected" : "") + '>' + p.label + '</option>').join("") +
       '<option value="custom"' + (tid === "custom" ? " selected" : "") + '>自定义…</option>' +
     '</select></label>';
-  h += '<label>调 <select data-fset="key">' +
+  if(!noKey) h += '<label>调 <select data-fset="key">' +
       FRET_KEYS.map(k=>'<option value="' + k.name + '"' + (fretKey().name === k.name ? " selected" : "") + '>' + k.name + ' 大调</option>').join("") +
-    '</select></label>' +
+    '</select></label>';
+  h +=
     '<label><input type="checkbox" data-fset="sound"' + (st.fretSound !== false ? " checked" : "") + '> 点击发声</label>' +
     '</div>';
   if(tid === "custom"){
@@ -421,14 +445,18 @@ function fretSettingsHtml(){
   if(S.fretMsg) h += '<div class="small" style="margin:-6px 0 12px;color:var(--bad)">' + esc(S.fretMsg) + '</div>';
   return h;
 }
-function renderFretMap(){
+function mapFoldOpen(modeKey){
+  const practiced = MODES[modeKey].levels.some(l=>levelStat(l.id).a > 0);
+  return (S.mapOpen || {})[modeKey] ?? !practiced;
+}
+function renderFretMap(modeKey){
+  if(modeKey && modeKey !== "fret" && MODES[modeKey].map) return MODES[modeKey].map();
   const tun = fretTuning(), key = fretKey(), box = fretBox(tun, key.pc, false);
   const whole = !!S.data.settings.fretMapWhole;
   const marks = whole ? degreeMarks(tun, key, 0, FRET_MAX) : degreeMarks(tun, key, box.lo, box.hi);
   const am = marks[box.anchor.s + "-" + box.anchor.f];
   if(am) am.cls += " anchor";
-  const practiced = MODES.fret.levels.some(l=>levelStat(l.id).a > 0);
-  const open = S.fretMapOpen ?? !practiced;
+  const open = mapFoldOpen("fret");
   let h = '<details class="fold card" id="fretMap"' + (open ? " open" : "") + '><summary><b>先看地图</b> <span class="muted small">' +
     key.name + ' 大调 · 1 在 ' + stringName(tun, box.anchor.s) + ' ' + box.anchor.f + ' 品</span></summary>' +
     '<div class="sub small" style="margin:8px 0">先知道答案再练。原点 1 在 <b>' + stringName(tun, box.anchor.s) + ' ' + box.anchor.f + ' 品</b>，' +
@@ -445,8 +473,53 @@ function fretRtBadge(level){
   const st = levelStat(level.id), md = medianRT(st);
   return '中位用时 <b>' + (md === null ? "–" : fmtSec(md)) + '</b> / ' + fmtSec(level.rtLimit);
 }
+function fretQuizHead(level){
+  const st = levelStat(level.id), r = recent20Rate(st);
+  return '<div class="quiz-head"><span class="small muted">' + level.name.split(" · ")[0] + '</span>' +
+    '<div class="quiz-stats"><span>近' + PASS_N + ' <b>' + (r === null ? "–" : pct(r)) + '</b></span>' +
+    '<span>' + fretRtBadge(level) + '</span><span>连对 <b>' + st.streak + '</b></span>' +
+    (st.passed ? '<span style="color:var(--good)">✓ 已过关</span>' : "") + '</div></div>';
+}
+/* 计时条：从满到空 = 过关目标时间，重绘时用负 delay 接着走 */
+function fretTimerHtml(q, limit){
+  if(S.answered) return '<div class="fp-timer done" aria-hidden="true"><i></i></div>';
+  const el = Math.min(limit, performance.now() - q.t0);
+  return '<div class="fp-timer" aria-hidden="true"><i style="animation-duration:' + limit + 'ms;animation-delay:-' + Math.round(el) + 'ms"></i></div>';
+}
+function fretOptionsHtml(q, cls){
+  return '<div class="opts ' + cls + '" style="margin-top:12px">' + q.options.map((o,i)=>{
+    let c = "opt";
+    if(S.answered){
+      if(o.value === q.answerValue) c += " correct";
+      else if(i === S.chosenIdx) c += " wrong";
+      else c += " dim";
+    }
+    return '<button class="' + c + '" data-act="answer" data-i="' + i + '"' + (S.answered ? " disabled" : "") + '>' +
+      (i < 9 ? '<span class="key-hint">' + (i+1) + '</span>' : "") + esc(o.label) +
+      (o.sub ? '<span class="opt-sub">' + esc(o.sub) + '</span>' : "") + '</button>';
+  }).join("") + '</div>';
+}
+function fretFootHtml(hint){
+  return '<div class="quiz-foot tiny muted">' +
+    '<label><input type="checkbox" data-fset="auto"' + (S.data.settings.fretAuto !== false ? " checked" : "") + '> 答对自动下一题</label>' +
+    '<span>' + hint + '</span></div>';
+}
+function fretFeedbackBox(m, ok, title, det, actions){
+  return '<div class="feedback ' + (ok ? "ok" : "no") + '" style="--mode-c:' + m.cssColor + ';--on-mode:' + (m.onColor || "#fff") + ';margin-top:12px">' +
+    '<div class="fb-title">' + (ok ? "✓ " : "✕ ") + title + '</div>' +
+    '<div class="fb-detail">' + det + '</div>' +
+    (S.q && S.q.auto ? "" :
+    '<div class="fb-actions"><button data-act="replay">' + (actions || "再听一遍（空格）") + '</button>' +
+    '<button class="next" data-act="next">下一题 <span class="kbd" style="color:inherit;border-color:currentColor;opacity:.75">回车</span></button></div>') + '</div>';
+}
+function fretTimeTxt(q, t, ok, perNote){
+  const lim = q.level.rtLimit;
+  return '用时 ' + fmtSec(t) + (perNote ? " / 每个音" : "") +
+    (ok ? (t <= lim ? '，在目标 ' + fmtSec(lim) + ' 内' : '，<span style="color:var(--warn)">慢于目标 ' + fmtSec(lim) + '</span>') : "");
+}
 function renderFretQuiz(){
-  const m = MODES.fret, level = m.levels[S.levelIdx], q = S.q;
+  const m = MODES[S.modeKey], level = m.levels[S.levelIdx], q = S.q;
+  if(q.ext) return fretQuizHead(level) + q.ext.render(q, m);
   const st = levelStat(level.id);
   const r = recent20Rate(st);
   const res = q.result;
@@ -592,11 +665,13 @@ function fretAfterRender(){
   document.querySelectorAll(".fb-scroll[data-lo]").forEach(el=>{
     if(el.scrollWidth <= el.clientWidth) return;
     const cell = el.querySelector('.fb-cell[data-f="' + el.dataset.lo + '"]');
-    if(cell) el.scrollLeft = Math.max(0, cell.offsetLeft - 70);
+    if(cell) el.scrollLeft = Math.max(0, cell.offsetLeft - (el.closest(".fb-scroll.wide") ? el.clientWidth/2 - 20 : 70));
   });
 }
 
-document.addEventListener("toggle", e=>{ if(e.target.id === "fretMap") S.fretMapOpen = e.target.open; }, true);
+document.addEventListener("toggle", e=>{
+  if(e.target.id === "fretMap"){ S.mapOpen = S.mapOpen || {}; S.mapOpen[S.modeKey] = e.target.open; }
+}, true);
 
 /* ---------------- 事件 ---------------- */
 function handleFretAct(act, btn){

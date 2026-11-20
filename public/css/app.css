@@ -12,7 +12,9 @@
     --accent-quality:#199e70;  /* 阶段2 性质 */
     --accent-pattern:#9085e9;  /* 阶段3 套路 */
     --accent-warm:#c98500;     /* 阶段0 热身 */
-    --accent-fret:#e0703c;     /* 指板 */
+    --accent-fret:#e0703c;     /* 指板 2 级数定位 */
+    --accent-board:#c9a227;    /* 指板 1 音名地形 */
+    --accent-motif:#d4568c;    /* 指板 3 模进 */
     --good:#0ca30c;
     --warn:#fab219;
     --bad:#d03b3b;
@@ -91,6 +93,8 @@
   .meter.q>i{background:var(--accent-quality);} .meter.q{background:rgba(25,158,112,.16);}
   .meter.p>i{background:var(--accent-pattern);} .meter.p{background:rgba(144,133,233,.16);}
   .meter.f>i{background:var(--accent-fret);} .meter.f{background:rgba(224,112,60,.16);}
+  .meter.b>i{background:var(--accent-board);} .meter.b{background:rgba(201,162,39,.16);}
+  .meter.m>i{background:var(--accent-motif);} .meter.m{background:rgba(212,86,140,.16);}
   .meter-label{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3);margin-bottom:3px;}
 
   /* ---------- 答题界面 ---------- */
@@ -131,7 +135,7 @@
   .fb-detail{font-size:13.5px;color:var(--ink-2);}
   .fb-detail b{color:var(--ink);}
   .fb-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
-  .fb-actions .next{background:var(--mode-c,var(--accent));border-color:transparent;color:#fff;font-weight:600;}
+  .fb-actions .next{background:var(--mode-c,var(--accent));border-color:transparent;color:var(--on-mode,#fff);font-weight:600;}
   .kbd{display:inline-block;font-size:11px;color:var(--ink-3);border:1px solid var(--hairline);
     border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px;}
 
@@ -174,6 +178,10 @@
   .fb-row{display:grid;grid-template-columns:22px repeat(var(--cols,16),minmax(36px,1fr));}
   .fb-scroll.win{overflow:visible;margin:0;padding:0;}
   .fb-scroll.win .fb{min-width:0;max-width:640px;margin:0 auto;}
+  /* 0–12 品整段：宽屏铺满，窄屏横向滚动 */
+  .fb-scroll.wide .fb{min-width:520px;}
+  .fb-scroll.wide .fb-row{grid-template-columns:22px repeat(var(--cols),minmax(34px,1fr));}
+  .fb-scroll.wide .fb-cell{height:40px;}
   .fb-scroll.win .fb-row{grid-template-columns:22px repeat(var(--cols),minmax(0,1fr));}
   .fb-scroll.win .fb-cell{height:46px;}
   .fb-scroll.win .fb-dot{min-width:32px;height:30px;border-radius:15px;font-size:13.5px;}
@@ -203,6 +211,7 @@
   .fb-dot.ok{background:var(--good);color:#fff;opacity:1;filter:none;}
   .fb-dot.ok.ring{background:transparent;color:var(--good);box-shadow:inset 0 0 0 2px var(--good);}
   .fb-dot.bad{background:var(--bad);color:#fff;}
+  .fb-dot.nat{background:#e8dfc4;color:#111;}
   .fb-dot.target{background:var(--accent-fret);color:#fff;animation:pulse 1.1s ease-in-out infinite;}
   .fb-nums .fb-num{font-size:10.5px;color:var(--ink-3);text-align:center;padding-top:3px;position:relative;}
   .fb-nums .fb-num.dot::after,.fb-nums .fb-num.dot2::after{content:"•";display:block;line-height:.6;color:var(--ink-2);}
@@ -221,12 +230,23 @@
   .fret-prompt .fp-seq span.done{color:var(--good);border-color:rgba(12,163,12,.45);}
   .fret-prompt .fp-seq span.bad{color:var(--bad);border-color:rgba(208,59,59,.5);}
 
+  /* 12 个音名选项：6 列，手机 4 列 */
+  .opts.n12{grid-template-columns:repeat(6,1fr);gap:8px;}
+  .opts.n12 .opt{padding:10px 4px;font-size:16px;}
+  /* 模进：按组排列的级数，当前音高亮，高八度上加点、低八度下加点 */
+  .mt-groups{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 10px;margin:10px 0 4px;}
+  .mt-g{display:inline-flex;gap:3px;padding:3px 5px;border-radius:9px;border:1px solid var(--hairline);}
+  .mt-n{position:relative;min-width:26px;padding:4px 2px;text-align:center;font-weight:700;font-size:17px;border-radius:6px;color:var(--ink-3);}
+  .mt-n.cur{color:var(--ink);background:rgba(212,86,140,.22);box-shadow:inset 0 0 0 1.5px var(--accent-motif);}
+  .mt-n.done{color:var(--good);} .mt-n.bad{color:var(--bad);}
+  .mt-n.up::before,.mt-n.dn::after{content:"•";position:absolute;left:0;right:0;font-size:10px;line-height:1;}
+  .mt-n.up::before{top:-4px;} .mt-n.dn::after{bottom:-5px;}
   /* 计时条：满 → 空 = 过关目标时间 */
   .fp-timer{height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;margin:10px auto 0;max-width:320px;}
-  .fp-timer>i{display:block;height:100%;background:var(--accent-fret);transform-origin:left;
+  .fp-timer>i{display:block;height:100%;background:var(--mode-c,var(--accent-fret));transform-origin:left;
     animation-name:fp-drain;animation-timing-function:linear;animation-fill-mode:forwards;}
   .fp-timer.done>i{animation:none;transform:scaleX(0);}
-  @keyframes fp-drain{0%{transform:scaleX(1);}85%{background:var(--accent-fret);}100%{transform:scaleX(0);background:var(--bad);}}
+  @keyframes fp-drain{0%{transform:scaleX(1);}85%{background:var(--mode-c,var(--accent-fret));}100%{transform:scaleX(0);background:var(--bad);}}
   .quiz-foot{display:flex;justify-content:center;align-items:center;gap:6px 14px;flex-wrap:wrap;text-align:center;margin-top:10px;}
   .quiz-foot label{display:flex;align-items:center;gap:5px;color:var(--ink-2);}
   details.fold{margin-bottom:12px;padding:12px 14px;}
@@ -252,6 +272,7 @@
   .opts.deg7 .opt{padding:10px 4px;font-size:16px;}
   @media (max-width:480px){
     .opts.deg7{grid-template-columns:repeat(4,1fr);}
+    .opts.n12{grid-template-columns:repeat(4,1fr);}
     .opts{grid-template-columns:repeat(2,1fr);}
     .quiz-stats{gap:9px;font-size:11.5px;}
   }
