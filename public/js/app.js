@@ -12,7 +12,7 @@ const store = {
 };
 store.init();
 function defaultData(){
-  return {v:1, days:{}, levels:{}, conf:{}, anchors:{},
+  return {v:1, days:{}, levels:{}, conf:{}, anchors:{}, lessons:{},
           settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", bassVoice:"smp-bass", rootHighOct:false,
                     fretStrings:5, fretTuning:"BEADG", fretCustom:{}, fretTuneV:2, fretKey:"C", fretSound:true}};
 }
@@ -96,7 +96,7 @@ function recordAnswer(levelId, correct, chosen, ms){
   day.n++; if(ok) day.c++;
   if(!ok){
     const cf = S.data.conf[levelId.split("-")[0]] || (S.data.conf[levelId.split("-")[0]] = {});
-    const kk = correct + (isFretLevel(levelId) ? " 认成 " : " 听成 ") + chosen;
+    const kk = correct + ((typeof thConfVerb === "function" && thConfVerb(levelId)) || (isFretLevel(levelId) ? " 认成 " : " 听成 ")) + chosen;
     cf[kk] = (cf[kk]||0) + 1;
   }
   saveData();
@@ -221,6 +221,7 @@ function genQuestion(){
   const kind = level.kind;
   const key = keyObj();
   S.answered = false; S.feedback = null; S.chosenIdx = -1;
+  if(isTheoryMode(S.modeKey)){ thGenQuestion(); return; }
   if(isFretMode(S.modeKey)){ genFretQuestion(); return; }
   if(kind === "deg"){
     const t = genDegTarget(level, key);
@@ -287,7 +288,7 @@ function startQuestion(){
   if(!(S.q && S.q.noAutoPlay)) playCurrent(false);
 }
 function playCurrent(slow){
-  const q = S.q; if(!q) return;
+  const q = S.q; if(!q || !q.events || !q.events.length) return;
   const bpm = (S.data.settings.bpm || 100) * (slow ? 0.72 : 1);
   const marks = [];
   (q.caps||[]).forEach(c=> marks.push({t:c.t, fn:()=> setCaption(c.text)}));
@@ -303,6 +304,7 @@ function playAdhoc(events, caps, bpm){
 /* ---------------- 作答与讲解 ---------------- */
 function submitAnswer(i){
   const q = S.q; if(!q || S.answered) return;
+  if(q.theory){ thSubmit(i); return; }
   if(q.fret){ fretSubmitOption(i); return; }
   const opt = q.options[i]; if(!opt) return;
   S.chosenIdx = i;
@@ -466,13 +468,14 @@ function renderTopbar(){
   const n = day ? day.n : 0;
   let left;
   if(S.screen === "home"){
-    left = '<div class="title-wrap"><h1>J-Rock 练耳训练器</h1><div class="subtitle">对应《Bassline 学习方法论》第三部分 · 阶段 0 到 3 · Bass 手专用</div></div>';
+    left = '<div class="title-wrap"><h1>J-Rock 练耳训练器</h1><div class="subtitle">练耳阶段 0 到 3 · 指板 · 乐理课 · Bass 手专用</div></div>';
   }else{
-    const names = {warmup:"阶段 0 · 唱级数热身", progress:"进度", auth:"账号", sources:"自定义音源", mode:"", quiz:""};
+    const names = {warmup:"阶段 0 · 唱级数热身", progress:"进度", auth:"账号", sources:"自定义音源", mode:"", quiz:"", lesson:""};
     let t = names[S.screen];
     // 手机顶栏只有一行：模式页显示模式名，答题页显示档位名（档号在下面的 quiz-head）
     if(S.screen === "mode") t = MODES[S.modeKey].name;
     if(S.screen === "quiz") t = MODES[S.modeKey].levels[S.levelIdx].name.replace(/^(档|阶段) \d+ · /,"");
+    if(S.screen === "lesson") t = TH_LESSONS[S.lessonId].title;
     left = '<button class="backbtn" data-act="back">← 返回</button><div class="title-wrap"><h2 style="margin:0">' + t + '</h2></div>';
   }
   const acct = API.offline ? "" :
@@ -539,6 +542,8 @@ function renderHome(){
       '<div class="mode-head"><span class="stage-tag">' + m.stage + '</span><h2>' + m.name + '</h2></div>' +
       '<div class="desc">' + m.desc + '</div><div class="lv-dots">' + dots + '</div></button>';
   }
+  h += thHomeCards();
+  h += '<h3 class="home-sec">记录与设置</h3>';
   h += '<button class="mode-card" data-act="nav-progress" style="--tag-c:var(--ink-3)">' +
     '<div class="mode-head"><span class="stage-tag">记录</span><h2>进度与数据</h2></div>' +
     '<div class="desc">每日题量、各档正确率、最常混淆的听错组合、数据导出' +
@@ -556,6 +561,7 @@ function renderMode(){
   const m = MODES[S.modeKey];
   let h = '<div class="card" style="margin-bottom:12px"><div class="sub small">' + m.desc + '</div></div>';
   if(isFretMode(S.modeKey)) h += fretSettingsHtml(S.modeKey) + renderFretMap(S.modeKey);
+  if(isTheoryMode(S.modeKey)) h += thLessonListHtml(S.modeKey);
   const firstUnpassed = m.levels.findIndex(lv=>!levelStat(lv.id).passed);
   h += m.levels.map((lv,i)=>{
     const st = levelStat(lv.id);
@@ -672,7 +678,7 @@ function renderProgress(){
     '<div class="tile"><div class="t-label">连续练习</div><div class="t-value">' + dayStreak() + '<span style="font-size:14px"> 天</span></div><div class="t-note">每天 10 到 15 分钟就算数</div></div>' +
     '<div class="tile"><div class="t-label">累计题数</div><div class="t-value">' + totN + '</div><div class="t-note">' + Object.keys(days).length + ' 个练习日</div></div>' +
     '<div class="tile"><div class="t-label">总正确率</div><div class="t-value">' + (totN?pct(totC/totN):"–") + '</div><div class="t-note">过关线 ' + pct(PASS_RATE) + '</div></div></div>';
-  for(const mk of ["root","quality","pattern","board","fret","motif"]){
+  for(const mk of ["root","quality","pattern","board","fret","motif"].concat(TH_MODE_KEYS)){
     const m = MODES[mk];
     h += '<div class="prog-section card" style="margin-bottom:12px"><h3>' + m.stage + ' · ' + m.name + '</h3>' +
       m.levels.map(lv=>{
@@ -683,7 +689,7 @@ function renderProgress(){
       }).join("") + '</div>';
   }
   const confRows = [];
-  const secName = {root:"根音", q:"性质", p:"套路", b:"音名", f:"级数定位", m:"模进"};
+  const secName = {root:"根音", q:"性质", p:"套路", b:"音名", f:"级数定位", m:"模进", tb:"基础乐理", dh:"调内和声", ph:"和声进阶", bl:"低音线与节奏"};
   Object.entries(S.data.conf).forEach(([sec,map])=>{
     Object.entries(map).forEach(([k,v])=> confRows.push({sec:secName[sec]||sec, k, v}));
   });
@@ -801,7 +807,8 @@ function render(){
   switch(S.screen){
     case "home": body = renderHome(); break;
     case "mode": body = renderMode(); break;
-    case "quiz": body = (S.q && S.q.fret) ? renderFretQuiz() : renderQuiz(); break;
+    case "quiz": body = (S.q && S.q.theory) ? thRenderQuiz() : (S.q && S.q.fret) ? renderFretQuiz() : renderQuiz(); break;
+    case "lesson": body = thRenderLesson(); break;
     case "warmup": body = renderWarmup(); break;
     case "progress": body = renderProgress(); break;
     case "auth": body = renderAuth(); break;
@@ -817,7 +824,9 @@ function render(){
 function goBack(){
   AE.stopAll();
   S.droneOn = false;
-  if(S.screen === "quiz"){ S.screen = "mode"; }
+  if(S.screen === "lesson" && S.lessonFromQuiz && S.q){ S.lessonFromQuiz = false; S.screen = "quiz"; render(); return; }
+  S.lessonFromQuiz = false;
+  if(S.screen === "quiz" || S.screen === "lesson"){ S.screen = "mode"; }
   else { S.screen = "home"; }
   S.q = null; S.answered = false; S.ioMsg = ""; S.resetArmed = false;
   render();
@@ -835,6 +844,7 @@ document.addEventListener("click", e=>{
   if(act.startsWith("auth-")){ handleAuth(act, btn); return; }
   if(act.startsWith("src-")){ handleSources(act, btn); return; }
   if(act.startsWith("fret-")){ handleFretAct(act, btn); return; }
+  if(act.startsWith("th-")){ handleTheoryAct(act, btn); return; }
   if(act === "continue" && S.data.last && MODES[S.data.last.mode]){
     S.modeKey = S.data.last.mode; S.levelIdx = S.data.last.i; S.screen = "quiz";
     AE.ensure(); startQuestion(); return;
@@ -1051,7 +1061,7 @@ document.addEventListener("keydown", e=>{
   if(e.key === " "){ e.preventDefault(); AE.ensure(); playCurrent(false); return; }
   if(e.key === "Enter"){ if(S.answered){ AE.ensure(); startQuestion(); } return; }
   const n = parseInt(e.key,10);
-  if(!isNaN(n) && n >= 1 && S.q && n <= S.q.options.length && !S.answered){ submitAnswer(n-1); }
+  if(!isNaN(n) && n >= 1 && S.q && S.q.options && n <= S.q.options.length && !S.answered){ submitAnswer(n-1); }
 });
 
 /* ---------------- 启动：先渲染，再恢复登录态与云端数据 ---------------- */
