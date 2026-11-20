@@ -470,8 +470,9 @@ function renderTopbar(){
   }else{
     const names = {warmup:"阶段 0 · 唱级数热身", progress:"进度", auth:"账号", sources:"自定义音源", mode:"", quiz:""};
     let t = names[S.screen];
-    if(S.screen === "mode") t = MODES[S.modeKey].stage + " · " + MODES[S.modeKey].name;
-    if(S.screen === "quiz") t = MODES[S.modeKey].name + " · " + MODES[S.modeKey].levels[S.levelIdx].name.replace(/^档 \d+ · /,"");
+    // 手机顶栏只有一行：模式页显示模式名，答题页显示档位名（档号在下面的 quiz-head）
+    if(S.screen === "mode") t = MODES[S.modeKey].name;
+    if(S.screen === "quiz") t = MODES[S.modeKey].levels[S.levelIdx].name.replace(/^档 \d+ · /,"");
     left = '<button class="backbtn" data-act="back">← 返回</button><div class="title-wrap"><h2 style="margin:0">' + t + '</h2></div>';
   }
   const acct = API.offline ? "" :
@@ -495,9 +496,25 @@ function sourceSelect(kind, cur, compact){
       '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + '>' + esc(l) + '</option>').join("") +
     '</select>';
 }
+function continueCardHtml(){
+  const L = S.data.last, m = L && MODES[L.mode], lv = m && m.levels[L.i];
+  if(!lv) return "";
+  const st = levelStat(lv.id), r = recent20Rate(st);
+  return '<button class="continue-card" data-act="continue" style="--tag-c:' + m.cssColor + '">' +
+    '<span class="cc-label">继续练习</span>' +
+    '<span class="cc-name">' + m.name + ' · ' + lv.name + '</span>' +
+    '<span class="cc-meta">' + (st.passed ? "已过关 · " : "") + (r === null ? "还没练过" : "近 " + Math.min(st.recent.length, PASS_N) + " 题 " + pct(r)) +
+    (lv.rtLimit && medianRT(st) !== null ? " · 中位 " + fmtSec(medianRT(st)) : "") + '</span>' +
+    '<span class="cc-go" aria-hidden="true">▶</span></button>';
+}
 function renderHome(){
   const st = S.data.settings;
-  let h = '<div class="settings-row card" style="padding:12px 14px">' +
+  const open = S.homeSetOpen ?? (window.innerWidth >= 700);
+  const bvName = (sourceOptions("bass").find(o=>o[0] === (st.bassVoice || "smp-bass")) || ["", ""])[1].replace(/（.*）/, "");
+  let h = continueCardHtml() +
+    '<details class="fold card" id="homeSet"' + (open ? " open" : "") + '><summary><b>练耳设置</b> <span class="muted small">' +
+    (st.random ? "随机调" : st.key + " 大调") + ' · ' + st.bpm + ' BPM · ' + esc(bvName) + '</span></summary>' +
+    '<div class="settings-row" style="margin:10px 0 0">' +
     '<label>调 <select data-set="key"' + (st.random?" disabled":"") + '>' +
       KEYS.map(k=>'<option value="'+k.name+'"'+(st.key===k.name?" selected":"")+'>'+k.name+' 大调</option>').join("") +
     '</select></label>' +
@@ -508,7 +525,7 @@ function renderHome(){
     '<label>贝斯音色 ' + sourceSelect("bass", st.bassVoice || "ks-bass", false) + '</label>' +
     '<label>和弦音色 ' + sourceSelect("chord", st.chordVoice || "gtr", false) + '</label>' +
     '<label>音量 <input type="range" min="0" max="1" step="0.05" value="' + st.vol + '" data-set="vol" style="width:90px"></label>' +
-  '</div>';
+  '</div></details>';
   h += '<button class="mode-card" data-act="nav-warmup" style="--tag-c:var(--accent-warm)">' +
     '<div class="mode-head"><span class="stage-tag">阶段 0</span><h2>唱级数热身</h2></div>' +
     '<div class="desc">先会唱，才会听。对着 drone 唱数字，每次开练前 2 到 3 分钟，永久保留。</div></button>';
@@ -538,7 +555,7 @@ function renderHome(){
 function renderMode(){
   const m = MODES[S.modeKey];
   let h = '<div class="card" style="margin-bottom:12px"><div class="sub small">' + m.desc + '</div></div>';
-  if(S.modeKey === "fret") h += fretSettingsHtml();
+  if(S.modeKey === "fret") h += fretSettingsHtml() + renderFretMap();
   const firstUnpassed = m.levels.findIndex(lv=>!levelStat(lv.id).passed);
   h += m.levels.map((lv,i)=>{
     const st = levelStat(lv.id);
@@ -559,7 +576,6 @@ function renderMode(){
         '<button class="opt" style="padding:10px;font-size:15px" data-act="preview-q" data-q="' + v + '">' + l +
         '<span class="opt-sub">' + s + '</span></button>').join("") + '</div>';
   }
-  if(S.modeKey === "fret") h += renderFretMap();
   if(S.modeKey === "pattern"){
     h += '<hr class="divider"><h3>套路图鉴</h3><div class="sub small" style="margin-bottom:8px">给每个套路配 3 首你熟的锚点歌，反复对照听。以后听到新歌先条件反射「是不是王道」，再核对细节。</div>';
     h += PATTERNS.map(p=>{
@@ -577,7 +593,7 @@ function renderQuiz(){
   const m = MODES[S.modeKey], level = m.levels[S.levelIdx], q = S.q;
   const st = levelStat(level.id);
   const r = recent20Rate(st);
-  let h = '<div class="quiz-head"><span class="small muted">' + level.name + '</span>' +
+  let h = '<div class="quiz-head"><span class="small muted">' + level.name.split(" · ")[0] + '</span>' +
     '<div class="quiz-stats"><span>近' + PASS_N + ' <b>' + (r===null?"–":pct(r)) + '</b></span>' +
     '<span>连对 <b>' + st.streak + '</b></span><span>本档 <b>' + st.c + "/" + st.a + '</b></span>' +
     (st.passed ? '<span style="color:var(--good)">✓ 已过关</span>' : "") + '</div></div>';
@@ -819,8 +835,13 @@ document.addEventListener("click", e=>{
   if(act.startsWith("auth-")){ handleAuth(act, btn); return; }
   if(act.startsWith("src-")){ handleSources(act, btn); return; }
   if(act.startsWith("fret-")){ handleFretAct(act, btn); return; }
+  if(act === "continue" && S.data.last && MODES[S.data.last.mode]){
+    S.modeKey = S.data.last.mode; S.levelIdx = S.data.last.i; S.screen = "quiz";
+    AE.ensure(); startQuestion(); return;
+  }
   if(act === "open-level"){
     S.levelIdx = parseInt(btn.dataset.i,10); S.screen = "quiz";
+    S.data.last = {mode:S.modeKey, i:S.levelIdx}; saveData();
     AE.ensure(); startQuestion(); return;
   }
   if(act === "answer"){ submitAnswer(parseInt(btn.dataset.i,10)); return; }
@@ -890,6 +911,7 @@ document.addEventListener("click", e=>{
     return;
   }
 });
+document.addEventListener("toggle", e=>{ if(e.target.id === "homeSet") S.homeSetOpen = e.target.open; }, true);
 /* ---------------- 账号与音源的异步动作 ---------------- */
 const $v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
 function authMsg(msg, isErr){ S.authMsg = msg || ""; S.authErr = !!isErr; render(); }

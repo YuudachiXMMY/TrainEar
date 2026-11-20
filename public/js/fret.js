@@ -289,7 +289,10 @@ function fretFinish(ok, extra){
   const q = S.q;
   S.answered = true;
   q.result = Object.assign({ok}, extra || {});
+  q.auto = ok && S.data.settings.fretAuto !== false;
   render();
+  // 答对自动进下一题（练的是速度，不该每题都停下来点按钮）；答错停住看反馈
+  if(q.auto) setTimeout(()=>{ if(S.q === q && S.answered && S.screen === "quiz") startQuestion(); }, 750);
 }
 function fretCellClick(s, f){
   const q = S.q;
@@ -351,25 +354,29 @@ function fretSubmitOption(i){
 }
 
 /* ---------------- 渲染 ---------------- */
+/* o.from/o.to：只画这一段品（答题时只画把位框前后各 1 品，格子更大、手机不用横向滚动） */
 function fretboardHtml(o){
   const tun = o.tun, n = tun.length, box = o.box, marks = o.marks || {};
-  let h = '<div class="fb-scroll"' + (box ? ' data-lo="' + box.lo + '"' : "") + '><div class="fb">';
+  const from = o.from ?? 0, to = o.to ?? FRET_MAX, win = from > 0 || to < FRET_MAX;
+  let h = '<div class="fb-scroll' + (win ? " win" : "") + '"' + (box && !win ? ' data-lo="' + box.lo + '"' : "") + '>' +
+    '<div class="fb" style="--cols:' + (to - from + 1) + '" role="group" aria-label="指板">';
   for(let s=n-1; s>=0; s--){
     const th = Math.max(1, 3.2 - s*0.5).toFixed(1);
     h += '<div class="fb-row" style="--th:' + th + 'px"><span class="fb-open">' + noteName(tun[s]) + '</span>';
-    for(let f=0; f<=FRET_MAX; f++){
+    for(let f=from; f<=to; f++){
       const inb = !box || (f >= box.lo && f <= box.hi);
       const mk = marks[s + "-" + f];
       const cls = "fb-cell" + (f === 0 ? " nut" : "") + (box ? (inb ? " inbox" : " outbox") : "");
       const dis = o.lockOutside && !inb;
+      const aria = noteName(tun[s]) + " 弦 " + f + " 品，" + noteNameOct(tun[s] + f) + (mk && mk.label ? "，标记 " + mk.label : "");
       h += '<button class="' + cls + '" data-act="fret-cell" data-s="' + s + '" data-f="' + f + '"' + (dis ? " disabled" : "") +
-        ' title="' + noteNameOct(tun[s] + f) + '">' +
+        ' title="' + noteNameOct(tun[s] + f) + '" aria-label="' + esc(aria) + '">' +
         (mk ? '<span class="fb-dot ' + mk.cls + '">' + esc(mk.label || "") + '</span>' : "") + '</button>';
     }
     h += '</div>';
   }
   h += '<div class="fb-row fb-nums"><span class="fb-open"></span>';
-  for(let f=0; f<=FRET_MAX; f++){
+  for(let f=from; f<=to; f++){
     const dot = [3,5,7,9,15].includes(f) ? " dot" : (f === 12 ? " dot2" : "");
     h += '<span class="fb-num' + dot + '">' + f + '</span>';
   }
@@ -420,15 +427,18 @@ function renderFretMap(){
   const marks = whole ? degreeMarks(tun, key, 0, FRET_MAX) : degreeMarks(tun, key, box.lo, box.hi);
   const am = marks[box.anchor.s + "-" + box.anchor.f];
   if(am) am.cls += " anchor";
-  let h = '<hr class="divider"><h3>先看地图（' + key.name + ' 大调）</h3>' +
-    '<div class="sub small" style="margin-bottom:8px">先知道答案再练。原点 1 在 <b>' + stringName(tun, box.anchor.s) + ' ' + box.anchor.f + ' 品</b>，' +
+  const practiced = MODES.fret.levels.some(l=>levelStat(l.id).a > 0);
+  const open = S.fretMapOpen ?? !practiced;
+  let h = '<details class="fold card" id="fretMap"' + (open ? " open" : "") + '><summary><b>先看地图</b> <span class="muted small">' +
+    key.name + ' 大调 · 1 在 ' + stringName(tun, box.anchor.s) + ' ' + box.anchor.f + ' 品</span></summary>' +
+    '<div class="sub small" style="margin:8px 0">先知道答案再练。原点 1 在 <b>' + stringName(tun, box.anchor.s) + ' ' + box.anchor.f + ' 品</b>，' +
     '把位框 ' + box.lo + '–' + box.hi + ' 品里七个级数都有。颜色：<span class="fn-T">主功能 1 3m 6m</span> · ' +
     '<span class="fn-S">下属 2m 4</span> · <span class="fn-D">属 5 7ø</span>。点任意格子听音。</div>' +
     '<div class="row small" style="margin-bottom:8px"><label style="display:flex;gap:6px;align-items:center;color:var(--ink-2)">' +
     '<input type="checkbox" data-fset="mapWhole"' + (whole ? " checked" : "") + '> 显示整条指板</label></div>';
   h += fretboardHtml({tun, box, marks});
   h += '<div class="note-box" style="margin-top:10px">以 1 为原点的根音形状（四度调弦的弦之间）：2 = 同弦 +2 · 3m = 上一弦 −1 · 4 = 上一弦同品 · 5 = 下一弦同品 / 上一弦 +2 · 6m = 下一弦 +2 · 7ø = 同弦 −1。' +
-    (irregularNote(tun, [[{s:0,f:0},{s:tun.length-1,f:0}]]) ? '<br>' + irregularNote(tun, [[{s:0,f:0},{s:tun.length-1,f:0}]]) : "") + '</div>';
+    (irregularNote(tun, [[{s:0,f:0},{s:tun.length-1,f:0}]]) ? '<br>' + irregularNote(tun, [[{s:0,f:0},{s:tun.length-1,f:0}]]) : "") + '</div></details>';
   return h;
 }
 function fretRtBadge(level){
@@ -440,7 +450,7 @@ function renderFretQuiz(){
   const st = levelStat(level.id);
   const r = recent20Rate(st);
   const res = q.result;
-  let h = '<div class="quiz-head"><span class="small muted">' + level.name + '</span>' +
+  let h = '<div class="quiz-head"><span class="small muted">' + level.name.split(" · ")[0] + '</span>' +
     '<div class="quiz-stats"><span>近' + PASS_N + ' <b>' + (r === null ? "–" : pct(r)) + '</b></span>' +
     '<span>' + fretRtBadge(level) + '</span><span>连对 <b>' + st.streak + '</b></span>' +
     (st.passed ? '<span style="color:var(--good)">✓ 已过关</span>' : "") + '</div></div>';
@@ -461,7 +471,14 @@ function renderFretQuiz(){
     h += '<div class="fp-main">' + esc(q.prompt) + '</div>';
   }
   h += '<div class="fp-sub">' + esc(q.promptSub) + '</div>' +
-    (q.hint && !S.answered ? '<div class="fp-hint">' + esc(q.hint) + '</div>' : "") + '</div>';
+    (q.hint && !S.answered ? '<div class="fp-hint">' + esc(q.hint) + '</div>' : "");
+  // 计时条：从满到空 = 过关目标时间，重绘时用负 delay 接着走
+  const limit = q.level.rtLimit * (q.kind === "f-seq" ? q.pat.seq.length : 1);
+  if(!S.answered){
+    const el = Math.min(limit, performance.now() - q.t0);
+    h += '<div class="fp-timer" aria-hidden="true"><i style="animation-duration:' + limit + 'ms;animation-delay:-' + Math.round(el) + 'ms"></i></div>';
+  }else h += '<div class="fp-timer done" aria-hidden="true"><i></i></div>';
+  h += '</div>';
 
   // 指板标记
   const marks = {};
@@ -482,7 +499,7 @@ function renderFretQuiz(){
       if(q.kind === "f-name") marks[q.cell.s + "-" + q.cell.f] = {cls: res.ok ? "ok" : "bad", label:q.target.k};
     }
     if(q.kind === "f-seq"){
-      q.hits.forEach((hh,i)=>{ marks[hh.s + "-" + hh.f] = {cls: hh.ok ? "ok" : "bad", label: hh.ok ? hh.dk : degLabelOfPc(q.key.pc, hh.midi % 12)}; });
+      q.hits.forEach((hh,i)=>{ marks[hh.s + "-" + hh.f] = {cls: hh.ok ? "ok" : "bad", label: hh.ok ? hh.dk : degLabelOfPc(q.key.pc, hh.midi % 12).replace(/^调外 /, "")}; });
       if(!res.ok){
         const dk = q.pat.seq[res.wrongAt], pc = (q.key.pc + FDEG_BY[dk].semi) % 12;
         for(const c of cellsIn(q.tun, q.box.lo, q.box.hi, p=>p === pc))
@@ -490,7 +507,7 @@ function renderFretQuiz(){
       }
     }
     if(res.clicked && !res.ok && q.kind !== "f-seq"){
-      const lab = q.kind === "f-tone" ? res.chosen : degLabelOfPc(q.key.pc, res.clicked.midi % 12);
+      const lab = q.kind === "f-tone" ? res.chosen : degLabelOfPc(q.key.pc, res.clicked.midi % 12).replace(/^调外 /, "");
       marks[res.clicked.s + "-" + res.clicked.f] = {cls:"bad", label:lab};
     }
   }else{
@@ -502,11 +519,13 @@ function renderFretQuiz(){
     else if(!marks[ak] || marks[ak].cls.includes("muted")) marks[ak] = {cls:"anchor", label:"1"};
     else marks[ak].cls += " anchor";
   }
-  h += fretboardHtml({tun:q.tun, box:q.box, marks, lockOutside:true});
+  let from = Math.max(0, q.box.lo - 1), to = Math.min(FRET_MAX, q.box.hi + 1);
+  while(to - from < 5){ if(to < FRET_MAX) to++; else from--; }   // 至少 6 品宽
+  h += fretboardHtml({tun:q.tun, box:q.box, marks, lockOutside:true, from, to});
 
   // 认级数：选项
   if(q.kind === "f-name"){
-    h += '<div class="opts narrow" style="margin-top:12px">' + q.options.map((o,i)=>{
+    h += '<div class="opts deg7" style="margin-top:12px">' + q.options.map((o,i)=>{
       let cls = "opt";
       if(S.answered){
         if(o.value === q.answerValue) cls += " correct";
@@ -519,9 +538,9 @@ function renderFretQuiz(){
   }
 
   if(S.answered && res) h += fretFeedbackHtml(q, res, m);
-  h += '<div class="tiny muted" style="text-align:center;margin-top:10px">' +
-    (q.kind === "f-name" ? "键盘：数字 1–7 选级数 · " : "直接点指板作答 · ") +
-    '空格听级数 · 回车下一题 · Esc 返回</div>';
+  h += '<div class="quiz-foot tiny muted">' +
+    '<label><input type="checkbox" data-fset="auto"' + (S.data.settings.fretAuto !== false ? " checked" : "") + '> 答对自动下一题</label>' +
+    '<span>' + (q.kind === "f-name" ? "数字 1–7 选级数 · " : "点指板作答 · ") + '空格听级数 · 回车下一题 · Esc 返回</span></div>';
   return h;
 }
 function fretFeedbackHtml(q, res, m){
@@ -563,8 +582,9 @@ function fretFeedbackHtml(q, res, m){
     '<div class="fb-title">' + (res.ok ? "✓ " : "✕ ") + title + '</div>' +
     '<div class="fb-detail">' + det + ' <span class="muted">' + timeTxt + '</span>' +
     (irr ? '<br><span style="color:var(--warn)">' + irr + '</span>' : "") + '</div>' +
+    (q.auto ? '' :
     '<div class="fb-actions"><button data-act="replay">听级数（空格）</button>' +
-    '<button class="next" data-act="next">下一题 <span class="kbd" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.35)">回车</span></button></div></div>';
+    '<button class="next" data-act="next">下一题 <span class="kbd" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.35)">回车</span></button></div>') + '</div>';
 }
 
 /* 窄屏时指板横向滚动：每次渲染后把把位框滚进视野 */
@@ -575,6 +595,8 @@ function fretAfterRender(){
     if(cell) el.scrollLeft = Math.max(0, cell.offsetLeft - 70);
   });
 }
+
+document.addEventListener("toggle", e=>{ if(e.target.id === "fretMap") S.fretMapOpen = e.target.open; }, true);
 
 /* ---------------- 事件 ---------------- */
 function handleFretAct(act, btn){
@@ -604,6 +626,7 @@ document.addEventListener("change", e=>{
     case "key": st.fretKey = el.value; break;
     case "sound": st.fretSound = el.checked; break;
     case "mapWhole": st.fretMapWhole = el.checked; break;
+    case "auto": st.fretAuto = el.checked; saveData(); return;   // 答题中切换，不重绘
   }
   saveData();
   render();
