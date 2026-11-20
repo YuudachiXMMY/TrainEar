@@ -13,7 +13,8 @@ const store = {
 store.init();
 function defaultData(){
   return {v:1, days:{}, levels:{}, conf:{}, anchors:{},
-          settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", bassVoice:"smp-bass", rootHighOct:false}};
+          settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", bassVoice:"smp-bass", rootHighOct:false,
+                    fretTuning:"CEADG", fretKey:"C", fretSound:true}};
 }
 function loadData(){
   try{
@@ -79,19 +80,23 @@ function levelStat(id){
   return S.data.levels[id];
 }
 function recent20Rate(st){ if(!st.recent.length) return null; return st.recent.reduce((x,y)=>x+y,0)/st.recent.length; }
-function recordAnswer(levelId, correct, chosen){
+function recordAnswer(levelId, correct, chosen, ms){
   const ok = (correct === chosen);
   const st = levelStat(levelId);
   st.a++; if(ok) st.c++;
   st.streak = ok ? st.streak+1 : 0;
   st.best = Math.max(st.best, st.streak);
   st.recent.push(ok?1:0); if(st.recent.length > PASS_N) st.recent.shift();
-  if(!st.passed && st.recent.length >= PASS_N && recent20Rate(st) >= PASS_RATE){ st.passed = true; st.passedOn = todayStr(); }
+  // 反应时间（指板档）：只记答对的题，过关还要求近 20 题中位用时不超过目标
+  if(ok && ms > 0){ st.rt = st.rt || []; st.rt.push(Math.round(ms)); if(st.rt.length > PASS_N) st.rt.shift(); }
+  const rtLim = levelRtLimit(levelId);
+  const rtOk = !rtLim || (medianRT(st) !== null && medianRT(st) <= rtLim);
+  if(!st.passed && st.recent.length >= PASS_N && recent20Rate(st) >= PASS_RATE && rtOk){ st.passed = true; st.passedOn = todayStr(); }
   const day = S.data.days[todayStr()] || (S.data.days[todayStr()] = {n:0,c:0});
   day.n++; if(ok) day.c++;
   if(!ok){
     const cf = S.data.conf[levelId.split("-")[0]] || (S.data.conf[levelId.split("-")[0]] = {});
-    const kk = correct + " 听成 " + chosen;
+    const kk = correct + (FRET_LEVEL_IDS.has(levelId) ? " 认成 " : " 听成 ") + chosen;
     cf[kk] = (cf[kk]||0) + 1;
   }
   saveData();
@@ -216,6 +221,7 @@ function genQuestion(){
   const kind = level.kind;
   const key = keyObj();
   S.answered = false; S.feedback = null; S.chosenIdx = -1;
+  if(S.modeKey === "fret"){ genFretQuestion(); return; }
   if(kind === "deg"){
     const t = genDegTarget(level, key);
     const b = buildRootQuestion(key, t.deg, t.midi);
@@ -276,6 +282,10 @@ function genQuestion(){
       idle:"这是哪个套路？"};
   }
 }
+function startQuestion(){
+  genQuestion(); render();
+  if(!(S.q && S.q.noAutoPlay)) playCurrent(false);
+}
 function playCurrent(slow){
   const q = S.q; if(!q) return;
   const bpm = (S.data.settings.bpm || 100) * (slow ? 0.72 : 1);
@@ -293,6 +303,7 @@ function playAdhoc(events, caps, bpm){
 /* ---------------- 作答与讲解 ---------------- */
 function submitAnswer(i){
   const q = S.q; if(!q || S.answered) return;
+  if(q.fret){ fretSubmitOption(i); return; }
   const opt = q.options[i]; if(!opt) return;
   S.chosenIdx = i;
   const correctLabel = q.options.find(o=>o.value===q.answerValue).label;
@@ -444,8 +455,10 @@ function levelMeterHtml(mode, level){
   const st = levelStat(level.id);
   const r = recent20Rate(st);
   const w = r === null ? 0 : Math.round(r*100);
+  const md = level.rtLimit ? medianRT(st) : null;
+  const rtTxt = level.rtLimit ? " · 中位 " + (md === null ? "–" : fmtSec(md)) + "/" + fmtSec(level.rtLimit) : "";
   return '<div class="meter-wrap"><div class="meter-label"><span>近 ' + Math.min(st.recent.length||0, PASS_N) + ' 题正确率</span><span>' +
-    (r===null ? "还没练过" : pct(r) + " · 共 " + st.a + " 题") + '</span></div>' +
+    (r===null ? "还没练过" : pct(r) + rtTxt + " · 共 " + st.a + " 题") + '</span></div>' +
     '<div class="meter ' + mode.meterCls + '"><i style="width:' + w + '%"></i></div></div>';
 }
 function renderTopbar(){
@@ -499,7 +512,7 @@ function renderHome(){
   h += '<button class="mode-card" data-act="nav-warmup" style="--tag-c:var(--accent-warm)">' +
     '<div class="mode-head"><span class="stage-tag">阶段 0</span><h2>唱级数热身</h2></div>' +
     '<div class="desc">先会唱，才会听。对着 drone 唱数字，每次开练前 2 到 3 分钟，永久保留。</div></button>';
-  for(const mk of ["root","quality","pattern"]){
+  for(const mk of ["root","quality","pattern","fret"]){
     const m = MODES[mk];
     const dots = m.levels.map((lv,i)=>{
       const stt = levelStat(lv.id);
@@ -525,6 +538,7 @@ function renderHome(){
 function renderMode(){
   const m = MODES[S.modeKey];
   let h = '<div class="card" style="margin-bottom:12px"><div class="sub small">' + m.desc + '</div></div>';
+  if(S.modeKey === "fret") h += fretSettingsHtml();
   const firstUnpassed = m.levels.findIndex(lv=>!levelStat(lv.id).passed);
   h += m.levels.map((lv,i)=>{
     const st = levelStat(lv.id);
@@ -545,6 +559,7 @@ function renderMode(){
         '<button class="opt" style="padding:10px;font-size:15px" data-act="preview-q" data-q="' + v + '">' + l +
         '<span class="opt-sub">' + s + '</span></button>').join("") + '</div>';
   }
+  if(S.modeKey === "fret") h += renderFretMap();
   if(S.modeKey === "pattern"){
     h += '<hr class="divider"><h3>套路图鉴</h3><div class="sub small" style="margin-bottom:8px">给每个套路配 3 首你熟的锚点歌，反复对照听。以后听到新歌先条件反射「是不是王道」，再核对细节。</div>';
     h += PATTERNS.map(p=>{
@@ -641,7 +656,7 @@ function renderProgress(){
     '<div class="tile"><div class="t-label">连续练习</div><div class="t-value">' + dayStreak() + '<span style="font-size:14px"> 天</span></div><div class="t-note">每天 10 到 15 分钟就算数</div></div>' +
     '<div class="tile"><div class="t-label">累计题数</div><div class="t-value">' + totN + '</div><div class="t-note">' + Object.keys(days).length + ' 个练习日</div></div>' +
     '<div class="tile"><div class="t-label">总正确率</div><div class="t-value">' + (totN?pct(totC/totN):"–") + '</div><div class="t-note">过关线 ' + pct(PASS_RATE) + '</div></div></div>';
-  for(const mk of ["root","quality","pattern"]){
+  for(const mk of ["root","quality","pattern","fret"]){
     const m = MODES[mk];
     h += '<div class="prog-section card" style="margin-bottom:12px"><h3>' + m.stage + ' · ' + m.name + '</h3>' +
       m.levels.map(lv=>{
@@ -652,7 +667,7 @@ function renderProgress(){
       }).join("") + '</div>';
   }
   const confRows = [];
-  const secName = {root:"根音", q:"性质", p:"套路"};
+  const secName = {root:"根音", q:"性质", p:"套路", f:"指板"};
   Object.entries(S.data.conf).forEach(([sec,map])=>{
     Object.entries(map).forEach(([k,v])=> confRows.push({sec:secName[sec]||sec, k, v}));
   });
@@ -770,13 +785,14 @@ function render(){
   switch(S.screen){
     case "home": body = renderHome(); break;
     case "mode": body = renderMode(); break;
-    case "quiz": body = renderQuiz(); break;
+    case "quiz": body = (S.q && S.q.fret) ? renderFretQuiz() : renderQuiz(); break;
     case "warmup": body = renderWarmup(); break;
     case "progress": body = renderProgress(); break;
     case "auth": body = renderAuth(); break;
     case "sources": body = renderSources(); break;
   }
   el.innerHTML = renderTopbar() + body;
+  fretAfterRender();
 }
 
 /* ================================================================
@@ -802,12 +818,13 @@ document.addEventListener("click", e=>{
   if(act === "nav-sources"){ S.screen = "sources"; S.srcMsg=""; render(); return; }
   if(act.startsWith("auth-")){ handleAuth(act, btn); return; }
   if(act.startsWith("src-")){ handleSources(act, btn); return; }
+  if(act.startsWith("fret-")){ handleFretAct(act, btn); return; }
   if(act === "open-level"){
     S.levelIdx = parseInt(btn.dataset.i,10); S.screen = "quiz";
-    AE.ensure(); genQuestion(); render(); playCurrent(false); return;
+    AE.ensure(); startQuestion(); return;
   }
   if(act === "answer"){ submitAnswer(parseInt(btn.dataset.i,10)); return; }
-  if(act === "next"){ AE.ensure(); genQuestion(); render(); playCurrent(false); return; }
+  if(act === "next"){ AE.ensure(); startQuestion(); return; }
   if(act === "replay"){ AE.ensure(); playCurrent(false); return; }
   if(act === "replay-slow"){ AE.ensure(); playCurrent(true); return; }
   if(act === "fb"){ AE.ensure(); runFeedbackAction(btn.dataset.fb); return; }
@@ -1010,7 +1027,7 @@ document.addEventListener("keydown", e=>{
   if(S.screen !== "quiz"){ if(e.key === "Escape" && S.screen !== "home") goBack(); return; }
   if(e.key === "Escape"){ goBack(); return; }
   if(e.key === " "){ e.preventDefault(); AE.ensure(); playCurrent(false); return; }
-  if(e.key === "Enter"){ if(S.answered){ AE.ensure(); genQuestion(); render(); playCurrent(false); } return; }
+  if(e.key === "Enter"){ if(S.answered){ AE.ensure(); startQuestion(); } return; }
   const n = parseInt(e.key,10);
   if(!isNaN(n) && n >= 1 && S.q && n <= S.q.options.length && !S.answered){ submitAnswer(n-1); }
 });

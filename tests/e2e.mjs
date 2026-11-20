@@ -78,6 +78,55 @@ await step("home + root quiz basic flow", async () => {
   await page.click('[data-act="back"]'); await page.click('[data-act="back"]');
 });
 
+// ---- 指板 · 级数定位：五档各答一对一错，检查判分、反应时间和混淆记录 ----
+await step("fretboard degree mode: 5 levels judge right and wrong", async () => {
+  await page.click('[data-act="nav-mode"][data-mode="fret"]');
+  await page.waitForSelector(".fb-cell");
+  const box = await page.evaluate(() => { const t = fretTuning(), b = fretBox(t, 0, false); return [t.join(","), b.anchor.s, b.anchor.f, b.lo, b.hi].join("|"); });
+  if (box !== "24,28,33,38,43|2|3|2|5") throw new Error("C 大调默认把位应为 A 弦 3 品、2–5 品，实际 " + box);
+  for (let lv = 0; lv < 5; lv++) {
+    await page.click(`[data-act="open-level"][data-i="${lv}"]`);
+    for (const wantOk of [true, false]) {
+      await page.waitForFunction(() => S.q && S.q.fret && !S.answered);
+      const kind = await page.evaluate(() => S.q.kind);
+      if (kind === "f-name") {
+        const i = await page.evaluate(w => { const i = S.q.options.findIndex(o => o.value === S.q.answerValue); return w ? i : (i + 1) % 7; }, wantOk);
+        await page.keyboard.press(String(i + 1));
+      } else if (kind === "f-seq") {
+        const cells = await page.evaluate(w => S.q.pat.seq.map((dk, i) => {
+          const pc = (S.q.key.pc + FDEG_BY[dk].semi) % 12;
+          return cellsIn(S.q.tun, S.q.box.lo, S.q.box.hi, p => w || i !== 1 ? p === pc : p !== pc)[0];
+        }), wantOk);
+        for (let i = 0; i < cells.length; i++) {
+          await page.click(`[data-act="fret-cell"][data-s="${cells[i].s}"][data-f="${cells[i].f}"]`);
+          if (!wantOk && i === 1) break;
+        }
+      } else {
+        const c = await page.evaluate(w => w ? S.q.targets[0] :
+          cellsIn(S.q.tun, S.q.box.lo, S.q.box.hi, () => true).find(c => !S.q.targets.some(t => t.s === c.s && t.f === c.f) &&
+            !(c.s === S.q.box.anchor.s && c.f === S.q.box.anchor.f)), wantOk);
+        await page.click(`[data-act="fret-cell"][data-s="${c.s}"][data-f="${c.f}"]`);
+      }
+      await page.waitForSelector(".feedback");
+      const ok = await page.evaluate(() => S.q.result.ok);
+      if (ok !== wantOk) throw new Error(`档 ${lv + 1} ${kind}: 期望 ${wantOk} 实际 ${ok}`);
+      await page.keyboard.press("Enter");
+    }
+    await page.click('[data-act="back"]');
+  }
+  const d = await page.evaluate(() => ({ lv: S.data.levels["f-1"], conf: S.data.conf.f }));
+  if (d.lv.a !== 2 || d.lv.c !== 1 || !(d.lv.rt && d.lv.rt.length === 1)) throw new Error("f-1 统计不对 " + JSON.stringify(d.lv));
+  if (!d.conf || !Object.keys(d.conf).some(k => k.includes(" 认成 "))) throw new Error("没有记录指板混淆");
+  // 自定义调弦：解析失败给提示、成功后生效
+  await page.selectOption('[data-fset="tuning"]', "custom");
+  await page.fill('[data-fset="tuningCustom"]', "B0 E1 A1 D2 G2");
+  await page.dispatchEvent('[data-fset="tuningCustom"]', "change");
+  const tun = await page.evaluate(() => fretTuning().join(","));
+  if (tun !== "23,28,33,38,43") throw new Error("自定义调弦没生效 " + tun);
+  await page.selectOption('[data-fset="tuning"]', "CEADG");
+  await page.click('[data-act="back"]');
+});
+
 // ---- 注册 + 邮箱验证码验证 ----
 await step("register with email verification", async () => {
   await page.click('[data-act="nav-auth"]');
@@ -126,6 +175,8 @@ await step("logout then password login restores progress", async () => {
   await page.fill("#f-pass", "bass12345");
   await page.click('[data-act="auth-login"]');
   await page.waitForFunction(() => API.user, null, { timeout: 5000 });
+  // API.user 先于云端进度拉取完成被赋值，等进度真正回来再判断
+  await page.waitForFunction(() => S.data.levels["q-1"], null, { timeout: 5000 }).catch(() => {});
   const a = await page.evaluate(() => (S.data.levels["q-1"] || { a: 0 }).a);
   if (a < 3) throw new Error("progress not restored from cloud, a=" + a);
 });
