@@ -5,14 +5,21 @@
    运行时调用 app.js 的 S、render、recordAnswer、levelStat 等（只在函数体内引用）。 */
 
 const FRET_MAX = 15;   // 画 0 到 15 品
-const FRET_TUNINGS = {
-  CEADG:{label:"C E A D G（五弦，低 B 调成 C）", notes:[24,28,33,38,43]},
-  BEADG:{label:"B E A D G（标准五弦）",          notes:[23,28,33,38,43]},
-  EADG: {label:"E A D G（四弦）",                notes:[28,33,38,43]},
-  DADG: {label:"D A D G（四弦 Drop D）",         notes:[26,33,38,43]},
-  EADGC:{label:"E A D G C（高音五弦）",          notes:[28,33,38,43,48]},
-  custom:{label:"自定义…",                       notes:null}
+// 调弦预设，按弦数分组；每组第一个是该弦数的标准调弦（切换弦数时的默认）
+const FRET_PRESETS = {
+  5:[{id:"BEADG",    label:"B E A D G（标准）",          notes:[23,28,33,38,43]},
+     {id:"CEADG",    label:"C E A D G（低 B 调成 C）",   notes:[24,28,33,38,43]},
+     {id:"ADGCF",    label:"A D G C F（整体降全音）",    notes:[21,26,31,36,41]},
+     {id:"BbEbAbDbGb",label:"B♭ E♭ A♭ D♭ G♭（整体降半音）", notes:[22,27,32,37,42]},
+     {id:"EADGC",    label:"E A D G C（高音五弦）",      notes:[28,33,38,43,48]}],
+  4:[{id:"EADG",     label:"E A D G（标准）",            notes:[28,33,38,43]},
+     {id:"DADG",     label:"D A D G（Drop D）",          notes:[26,33,38,43]},
+     {id:"EbAbDbGb", label:"E♭ A♭ D♭ G♭（整体降半音）", notes:[27,32,37,42]},
+     {id:"DGCF",     label:"D G C F（整体降全音）",      notes:[26,31,36,41]},
+     {id:"CGCF",     label:"C G C F（Drop C）",          notes:[24,31,36,41]}]
 };
+const FRET_DEFAULT_STRINGS = 5;
+const CUSTOM_LO = 18, CUSTOM_HI = 55;   // 自定义每根弦可选 F#0 到 G3
 const FRET_KEYS = [
   {name:"C",pc:0},{name:"D♭",pc:1},{name:"D",pc:2},{name:"E♭",pc:3},{name:"E",pc:4},{name:"F",pc:5},
   {name:"F♯",pc:6},{name:"G",pc:7},{name:"A♭",pc:8},{name:"A",pc:9},{name:"B♭",pc:10},{name:"B",pc:11}
@@ -75,11 +82,43 @@ function parseTuning(str){
   for(let i=1; i<out.length; i++) if(out[i] <= out[i-1]) return null;
   return out;
 }
+function fretStrings(){ return S.data.settings.fretStrings === 4 ? 4 : 5; }
+function validTuning(arr, n){
+  if(!Array.isArray(arr) || arr.length !== n) return false;
+  for(let i=0; i<n; i++){
+    if(!Number.isInteger(arr[i]) || arr[i] < CUSTOM_LO || arr[i] > CUSTOM_HI) return false;
+    if(i && arr[i] <= arr[i-1]) return false;
+  }
+  return true;
+}
+function fretCustom(n){
+  const c = (S.data.settings.fretCustom || {})[n];
+  return validTuning(c, n) ? c.slice() : FRET_PRESETS[n][0].notes.slice();
+}
 function fretTuning(){
-  const st = S.data.settings;
-  const id = st.fretTuning || "CEADG";
-  if(id === "custom"){ const n = parseTuning(st.fretTuningCustom); if(n) return n; }
-  return (FRET_TUNINGS[id] && FRET_TUNINGS[id].notes) || FRET_TUNINGS.CEADG.notes;
+  const st = S.data.settings, n = fretStrings();
+  if(st.fretTuning === "custom") return fretCustom(n);
+  const p = FRET_PRESETS[n].find(x=>x.id === st.fretTuning) || FRET_PRESETS[n][0];
+  return p.notes.slice();
+}
+function tuningText(tun){ return tun.map(noteName).join(" "); }
+/* 一次性迁移：旧版只有 fretTuning 一个字段（默认 CEADG）。
+   新版拆成 弦数 + 调弦，默认改为 5 弦 BEADG（2026-11-20 按 Jadyn 要求）。 */
+function fretMigrate(st){
+  if(!st || st.fretTuneV >= 2) return st;
+  const old = st.fretTuning;
+  if(old === "custom"){
+    const arr = parseTuning(st.fretTuningCustom);
+    if(arr && (arr.length === 4 || arr.length === 5) && validTuning(arr, arr.length)){
+      st.fretStrings = arr.length;
+      st.fretCustom = Object.assign({}, st.fretCustom, {[arr.length]: arr});
+    }else{ st.fretStrings = FRET_DEFAULT_STRINGS; st.fretTuning = "BEADG"; }
+  }else if(old === "EADG" || old === "DADG"){ st.fretStrings = 4; }
+  else if(old === "EADGC"){ st.fretStrings = 5; }
+  else { st.fretStrings = FRET_DEFAULT_STRINGS; st.fretTuning = "BEADG"; }
+  delete st.fretTuningCustom;
+  st.fretTuneV = 2;
+  return st;
 }
 function fretKey(){ return FRET_KEYS.find(k=>k.name === S.data.settings.fretKey) || FRET_KEYS[0]; }
 function stringName(tun, s){ return noteName(tun[s]) + " 弦"; }
@@ -347,20 +386,31 @@ function degreeMarks(tun, key, lo, hi, opt){
   return marks;
 }
 function fretSettingsHtml(){
-  const st = S.data.settings;
-  const tid = st.fretTuning || "CEADG";
-  let h = '<div class="settings-row card" style="padding:12px 14px">' +
+  const st = S.data.settings, n = fretStrings();
+  const presets = FRET_PRESETS[n];
+  const tid = st.fretTuning === "custom" ? "custom" : (presets.find(p=>p.id === st.fretTuning) || presets[0]).id;
+  let h = '<div class="settings-row card" style="padding:12px 14px;flex-direction:column;align-items:stretch;gap:10px">' +
+    '<div class="row" style="gap:12px">' +
+    '<label>贝斯 <select data-fset="strings">' +
+      [4,5].map(k=>'<option value="' + k + '"' + (n === k ? " selected" : "") + '>' + k + ' 弦</option>').join("") +
+    '</select></label>' +
     '<label>调弦 <select data-fset="tuning">' +
-      Object.entries(FRET_TUNINGS).map(([id,t])=>'<option value="' + id + '"' + (tid === id ? " selected" : "") + '>' + t.label + '</option>').join("") +
+      presets.map(p=>'<option value="' + p.id + '"' + (tid === p.id ? " selected" : "") + '>' + p.label + '</option>').join("") +
+      '<option value="custom"' + (tid === "custom" ? " selected" : "") + '>自定义…</option>' +
     '</select></label>';
-  if(tid === "custom"){
-    h += '<label><input type="text" data-fset="tuningCustom" placeholder="低到高，如 C1 E1 A1 D2 G2" value="' + esc(st.fretTuningCustom || "") + '" style="width:190px"></label>';
-  }
   h += '<label>调 <select data-fset="key">' +
       FRET_KEYS.map(k=>'<option value="' + k.name + '"' + (fretKey().name === k.name ? " selected" : "") + '>' + k.name + ' 大调</option>').join("") +
     '</select></label>' +
     '<label><input type="checkbox" data-fset="sound"' + (st.fretSound !== false ? " checked" : "") + '> 点击发声</label>' +
     '</div>';
+  if(tid === "custom"){
+    const cur = fretCustom(n);
+    const opts = sel => { let o = ""; for(let m=CUSTOM_LO; m<=CUSTOM_HI; m++) o += '<option value="' + m + '"' + (m === sel ? " selected" : "") + '>' + noteNameOct(m) + '</option>'; return o; };
+    h += '<div class="row" style="gap:8px"><span class="small muted">每根弦（低 → 高）</span>' +
+      cur.map((m,i)=>'<select data-fset="customStr" data-i="' + i + '" title="第 ' + (n - i) + ' 弦">' + opts(m) + '</select>').join("") +
+      '</div>';
+  }
+  h += '</div>';
   if(S.fretMsg) h += '<div class="small" style="margin:-6px 0 12px;color:var(--bad)">' + esc(S.fretMsg) + '</div>';
   return h;
 }
@@ -400,7 +450,7 @@ function renderFretQuiz(){
   const anchorTxt = q.kind === "f-tone" ? "" :
     (q.showAnchor ? ' · 1 在 ' + stringName(q.tun, q.box.anchor.s) + ' ' + q.box.anchor.f + ' 品' : ' · 先自己找到 1');
   h += '<div class="fret-prompt" style="--mode-c:' + m.cssColor + '">' +
-    '<div class="fp-key">' + q.key.name + ' 大调' + boxTxt + anchorTxt + '</div>';
+    '<div class="fp-key">' + q.key.name + ' 大调' + boxTxt + anchorTxt + ' · ' + q.tun.length + ' 弦 ' + tuningText(q.tun) + '</div>';
   if(q.kind === "f-seq"){
     h += '<div class="fp-seq">' + q.pat.seq.map((d,i)=>{
       const hit = q.hits[i];
@@ -536,11 +586,21 @@ document.addEventListener("change", e=>{
   const st = S.data.settings;
   S.fretMsg = "";
   switch(el.dataset.fset){
-    case "tuning": st.fretTuning = el.value; break;
-    case "tuningCustom":
-      if(parseTuning(el.value)) st.fretTuningCustom = el.value.trim();
-      else S.fretMsg = "没认出来：从低到高写 4 到 7 个音名加八度，如 C1 E1 A1 D2 G2";
+    case "strings": {
+      const n = parseInt(el.value, 10) === 4 ? 4 : 5;
+      st.fretStrings = n;
+      // 换弦数后，原调弦若不属于新弦数就回到标准调弦；自定义保持（每种弦数各存一份）
+      if(st.fretTuning !== "custom" && !FRET_PRESETS[n].some(p=>p.id === st.fretTuning)) st.fretTuning = FRET_PRESETS[n][0].id;
       break;
+    }
+    case "tuning": st.fretTuning = el.value; break;
+    case "customStr": {
+      const n = fretStrings(), arr = fretCustom(n);
+      arr[parseInt(el.dataset.i, 10)] = parseInt(el.value, 10);
+      if(validTuning(arr, n)) st.fretCustom = Object.assign({}, st.fretCustom, {[n]: arr});
+      else S.fretMsg = "每根弦要比下面那根高：从低到高依次升高，没有保存这次改动";
+      break;
+    }
     case "key": st.fretKey = el.value; break;
     case "sound": st.fretSound = el.checked; break;
     case "mapWhole": st.fretMapWhole = el.checked; break;

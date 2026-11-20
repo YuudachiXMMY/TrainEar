@@ -14,14 +14,14 @@ store.init();
 function defaultData(){
   return {v:1, days:{}, levels:{}, conf:{}, anchors:{},
           settings:{key:"E", random:false, bpm:100, vol:0.8, chordVoice:"gtr", bassVoice:"smp-bass", rootHighOct:false,
-                    fretTuning:"CEADG", fretKey:"C", fretSound:true}};
+                    fretStrings:5, fretTuning:"BEADG", fretCustom:{}, fretTuneV:2, fretKey:"C", fretSound:true}};
 }
 function loadData(){
   try{
     const raw = store.get(DATA_KEY);
     if(raw){
       const d = JSON.parse(raw);
-      const merged = Object.assign(defaultData(), d, {settings:Object.assign(defaultData().settings, d.settings||{})});
+      const merged = Object.assign(defaultData(), d, {settings:fretMigrate(Object.assign(defaultData().settings, d.settings||{}, {fretTuneV:(d.settings||{}).fretTuneV||0}))});
       // 一次性迁移：把老默认的建模贝斯升级为采样电贝斯（用户之后仍可手动选回）
       if(!merged.settings.srcMigrated){
         if(merged.settings.bassVoice === "ks-bass") merged.settings.bassVoice = "smp-bass";
@@ -57,7 +57,7 @@ async function afterLogin(){
   const pr = await API.getProgress();
   if(pr && pr.data){
     S.data = Object.assign(defaultData(), pr.data,
-      {settings: Object.assign(defaultData().settings, pr.data.settings || {})});
+      {settings: fretMigrate(Object.assign(defaultData().settings, pr.data.settings || {}, {fretTuneV:(pr.data.settings||{}).fretTuneV||0}))});
     if(!S.data.settings.srcMigrated){
       if(S.data.settings.bassVoice === "ks-bass") S.data.settings.bassVoice = "smp-bass";
       S.data.settings.srcMigrated = 1;
@@ -879,7 +879,7 @@ document.addEventListener("click", e=>{
     try{
       const d = JSON.parse(ta.value);
       if(!d || typeof d !== "object" || !d.v) throw new Error("bad");
-      S.data = Object.assign(defaultData(), d, {settings:Object.assign(defaultData().settings, d.settings||{})});
+      S.data = Object.assign(defaultData(), d, {settings:fretMigrate(Object.assign(defaultData().settings, d.settings||{}, {fretTuneV:(d.settings||{}).fretTuneV||0}))});
       saveData(); S.ioText = ta.value; S.ioMsg = "导入成功。"; render();
     }catch(err){ S.ioText = ta.value; S.ioMsg = "导入失败：这段文本不是有效的进度数据。"; render(); }
     return;

@@ -83,7 +83,7 @@ await step("fretboard degree mode: 5 levels judge right and wrong", async () => 
   await page.click('[data-act="nav-mode"][data-mode="fret"]');
   await page.waitForSelector(".fb-cell");
   const box = await page.evaluate(() => { const t = fretTuning(), b = fretBox(t, 0, false); return [t.join(","), b.anchor.s, b.anchor.f, b.lo, b.hi].join("|"); });
-  if (box !== "24,28,33,38,43|2|3|2|5") throw new Error("C 大调默认把位应为 A 弦 3 品、2–5 品，实际 " + box);
+  if (box !== "23,28,33,38,43|2|3|2|5") throw new Error("默认应为 5 弦 BEADG、C 大调 A 弦 3 品、2–5 品，实际 " + box);
   for (let lv = 0; lv < 5; lv++) {
     await page.click(`[data-act="open-level"][data-i="${lv}"]`);
     for (const wantOk of [true, false]) {
@@ -117,13 +117,27 @@ await step("fretboard degree mode: 5 levels judge right and wrong", async () => 
   const d = await page.evaluate(() => ({ lv: S.data.levels["f-1"], conf: S.data.conf.f }));
   if (d.lv.a !== 2 || d.lv.c !== 1 || !(d.lv.rt && d.lv.rt.length === 1)) throw new Error("f-1 统计不对 " + JSON.stringify(d.lv));
   if (!d.conf || !Object.keys(d.conf).some(k => k.includes(" 认成 "))) throw new Error("没有记录指板混淆");
-  // 自定义调弦：解析失败给提示、成功后生效
+  // 弦数与调弦：4 弦切换、预设、逐弦自定义（非法时拒绝）、切回 5 弦
+  const tunNow = () => page.evaluate(() => fretTuning().join(","));
+  await page.selectOption('[data-fset="strings"]', "4");
+  if (await tunNow() !== "28,33,38,43") throw new Error("切 4 弦应回到 EADG");
+  await page.selectOption('[data-fset="tuning"]', "DADG");
+  if (await tunNow() !== "26,33,38,43") throw new Error("Drop D 没生效");
   await page.selectOption('[data-fset="tuning"]', "custom");
-  await page.fill('[data-fset="tuningCustom"]', "B0 E1 A1 D2 G2");
-  await page.dispatchEvent('[data-fset="tuningCustom"]', "change");
-  const tun = await page.evaluate(() => fretTuning().join(","));
-  if (tun !== "23,28,33,38,43") throw new Error("自定义调弦没生效 " + tun);
-  await page.selectOption('[data-fset="tuning"]', "CEADG");
+  if ((await page.$$('[data-fset="customStr"]')).length !== 4) throw new Error("4 弦自定义应有 4 个选择框");
+  await page.selectOption('[data-fset="customStr"][data-i="0"]', "24");
+  if (await tunNow() !== "24,33,38,43") throw new Error("逐弦自定义没生效");
+  await page.selectOption('[data-fset="customStr"][data-i="1"]', "20");
+  if (await tunNow() !== "24,33,38,43") throw new Error("非升序调弦不该被保存");
+  if (!(await page.textContent(".app-fret-msg, body")).includes("每根弦要比下面那根高")) throw new Error("没有非法调弦提示");
+  await page.selectOption('[data-fset="strings"]', "5");
+  if (await tunNow() !== "23,28,33,38,43") throw new Error("切回 5 弦自定义应默认为 BEADG");
+  await page.selectOption('[data-fset="tuning"]', "BEADG");
+  // 旧数据迁移：旧默认 CEADG → 5 弦 BEADG；旧自定义 4 弦字符串 → 4 弦自定义
+  const mig = await page.evaluate(() => [fretMigrate({fretTuning:"CEADG"}), fretMigrate({fretTuning:"custom", fretTuningCustom:"D1 A1 D2 G2"}), fretMigrate({fretTuning:"DADG"})]);
+  if (mig[0].fretStrings !== 5 || mig[0].fretTuning !== "BEADG") throw new Error("CEADG 迁移不对 " + JSON.stringify(mig[0]));
+  if (mig[1].fretStrings !== 4 || mig[1].fretCustom[4].join(",") !== "26,33,38,43") throw new Error("自定义迁移不对 " + JSON.stringify(mig[1]));
+  if (mig[2].fretStrings !== 4 || mig[2].fretTuning !== "DADG") throw new Error("Drop D 迁移不对");
   await page.click('[data-act="back"]');
 });
 
@@ -141,6 +155,8 @@ await step("register with email verification", async () => {
   await page.fill("#f-code", code);
   await page.click('[data-act="auth-verify"]');
   await page.waitForFunction(() => API.user && API.user.username === "jadyn", null, { timeout: 5000 });
+  // API.user 先赋值、拉完云端数据才重绘，等顶栏真正出现账号
+  await page.waitForFunction(() => document.querySelector(".topbar").textContent.includes("jadyn"), null, { timeout: 5000 }).catch(() => {});
   const chip = await page.textContent(".topbar");
   if (!chip.includes("jadyn")) throw new Error("no account chip");
 });
