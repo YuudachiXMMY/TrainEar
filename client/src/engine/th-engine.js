@@ -1,6 +1,6 @@
 "use strict";
 /* 乐理课引擎：拼写（字母 + 升降号）、课程页、选择题 / 指板题 / 节奏题的出题、作答与渲染。
-   课程内容在 th-basics.js、th-harmony.js、th-advanced.js、th-bassline.js 里用 thRegisterCourse 注册。
+   课程内容在 th-basics.js、th-harmony.js、th-advanced.js、th-bassline.js、th-chords.js 里用 thRegisterCourse 注册。
    依赖：theory.js（MODES、DEGREES、CHORD_SHAPES、PATTERNS、OUTSIDE_POOL…）、audio.js（AE、voiceLead、foldBass…）、
    fret.js（fretboardHtml、fretTuning、fretBox、cellsIn、relText…）。运行时调用 state.js 的 S、render、recordAnswer 等。
    全局名一律以 th / TH_ 开头，避免和其他脚本的顶层声明冲突。 */
