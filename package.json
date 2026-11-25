@@ -6,14 +6,33 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js",
+    "dev:server": "node --watch server/index.js",
+    "dev:client": "vite",
+    "dev": "concurrently -n server,client -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "npm run typecheck && vite build",
     "test": "node tests/e2e.mjs"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "express": "^4.21.2",
     "multer": "^1.4.5-lts.2",
-    "nodemailer": "^6.10.1"
+    "nodemailer": "^6.10.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "playwright": "^1.65.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
   }
 }
