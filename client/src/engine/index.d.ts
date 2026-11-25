@@ -211,6 +211,17 @@ export const Samples: {
   nearestLoaded(group: string, midi: number): unknown;
   [key: string]: unknown;
 };
+export const BuiltinBass: {
+  notes: number[];
+  rr: number;
+  buffers: Record<string, unknown>;
+  seq: Record<number, number>;
+  key(m: number, r: number): string;
+  nearest(midi: number): number;
+  load(root: number): Promise<void>;
+  preloadAll(): void;
+  [key: string]: unknown;
+};
 export function keyObj(): { name: string; pc: number };
 export function noteName(midi: number): string;
 export function noteNameOct(midi: number): string;

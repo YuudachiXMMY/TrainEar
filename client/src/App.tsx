@@ -8,7 +8,7 @@ import { LessonsView } from "./views/LessonsView";
 import { ProfileView } from "./views/ProfileView";
 import { NAV_ITEMS, type TabId } from "./nav";
 import { getHomeData, getLessonItems, getPracticeItems, getProfileStats } from "./appData";
-import { API, S, MODES, AE, setRenderer, startQuestion, handleTheoryAct, saveData } from "./engine/index.js";
+import { API, S, MODES, AE, BuiltinBass, setRenderer, startQuestion, handleTheoryAct, saveData, afterLogin } from "./engine/index.js";
 import { QuizScreen } from "./screens/QuizScreen";
 import { LessonScreen } from "./screens/LessonScreen";
 import { WarmupScreen } from "./screens/WarmupScreen";
@@ -29,6 +29,25 @@ export default function App() {
   useEffect(() => {
     setRenderer(() => bumpDataVersion());
     return () => setRenderer(null);
+  }, []);
+
+  // 原 app.js 的 init() 启动逻辑（先恢复登录态与云端数据，再按默认音色决定要不要预载内置
+  // 采样电贝斯）——React 化时这段启动代码被漏迁了，导致刷新页面后登录态和内置贝斯预载都
+  // 没有了；这里按原样补回来，不是新行为。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!API.offline) {
+        const r = await API.me();
+        if (!cancelled && r && r.user) {
+          API.user = r.user;
+          await afterLogin();
+        }
+      }
+      if ((S.data.settings.bassVoice || "smp-bass") === "smp-bass") BuiltinBass.preloadAll();
+      if (!cancelled) bumpDataVersion();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const homeData = useMemo(() => getHomeData(), [dataVersion]);

@@ -4,7 +4,7 @@ import { API, AE, Samples, noteNameOct, type SampleEntry } from "../engine/index
 /* 自定义音源页：手写 JSX 重排 legacy renderSources()/handleSources()/midiFromFilename()
    （app.js 766~802、978~1035行），上传/试听/删除逻辑逐字照搬，只是把拼 HTML 换成
    JSX + 本地 state。 */
-function midiFromFilename(fn: string): number | null {
+export function midiFromFilename(fn: string): number | null {
   const m = String(fn).match(/([A-Ga-g])([#b♯♭]?)(-?\d)/);
   if (!m) return null;
   const base: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
