@@ -3,3 +3,5 @@ data/
 .env
 *.log
 .DS_Store
+client/legacy-src/
+.playwright-mcp/
