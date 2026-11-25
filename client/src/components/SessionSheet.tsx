@@ -6,6 +6,8 @@ export interface SessionInfo {
   durationLabel: string;
   countLabel: string;
   difficultyLabel: string;
+  modeKey: string;
+  levelIdx: number;
 }
 
 const FOCUSABLE_SELECTOR =

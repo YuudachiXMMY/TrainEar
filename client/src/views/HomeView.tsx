@@ -7,6 +7,8 @@ export interface StageItem {
   progress: number;
   color: string;
   icon: IconName;
+  modeKey: string;
+  levelIdx: number;
 }
 
 export interface WeekItem {
@@ -33,9 +35,10 @@ export function HomeView({
   onViewAll,
 }: {
   data: HomeData;
-  onStart: (title: string) => void;
+  onStart: (modeKey: string, levelIdx: number) => void;
   onViewAll: () => void;
 }) {
+  const heroMode = data.stages[0];
   return (
     <>
       <section className="greeting">
@@ -68,7 +71,11 @@ export function HomeView({
             ))}
           </h2>
           <p>{data.heroDesc}</p>
-          <button className="primary-btn" onClick={() => onStart("根音走向 · 今日训练")}>
+          <button
+            className="primary-btn"
+            disabled={!heroMode}
+            onClick={() => heroMode && onStart(heroMode.modeKey, heroMode.levelIdx)}
+          >
             <span className="play-disc">
               <Icon name="play" size={18} />
             </span>
@@ -106,7 +113,11 @@ export function HomeView({
           </div>
           <div className="stage-list">
             {data.stages.map((stage) => (
-              <button className="stage-row" key={stage.title} onClick={() => onStart(stage.title)}>
+              <button
+                className="stage-row"
+                key={stage.title}
+                onClick={() => onStart(stage.modeKey, stage.levelIdx)}
+              >
                 <span className="stage-icon" style={{ color: stage.color, background: `${stage.color}18` }}>
                   <Icon name={stage.icon} />
                 </span>

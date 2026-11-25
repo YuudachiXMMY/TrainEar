@@ -8,6 +8,8 @@ export interface PracticeItem {
   progress: number;
   color: string;
   icon: IconName;
+  modeKey: string;
+  levelIdx: number;
 }
 
 const FILTERS = ["全部", "练耳", "指板", "乐理"];
@@ -15,9 +17,11 @@ const FILTERS = ["全部", "练耳", "指板", "乐理"];
 export function PracticeView({
   items,
   onStart,
+  onOpenWarmup,
 }: {
   items: PracticeItem[];
-  onStart: (title: string) => void;
+  onStart: (modeKey: string, levelIdx: number) => void;
+  onOpenWarmup: () => void;
 }) {
   const [filter, setFilter] = useState("全部");
   const visible = items.filter((x) => filter === "全部" || x.tag.startsWith(filter));
@@ -38,9 +42,25 @@ export function PracticeView({
           </button>
         ))}
       </div>
+      {filter === "全部" && (
+        <div className="practice-grid" style={{ marginBottom: 12 }}>
+          <button className="practice-card" onClick={onOpenWarmup}>
+            <span className="stage-icon" style={{ color: "#c98500", background: "#c9850018" }}>
+              <Icon name="flame" />
+            </span>
+            <small>阶段 0 · 热身</small>
+            <h3>唱级数热身</h3>
+            <p>先会唱，才会听。对着 drone 唱数字，每次开练前 2 到 3 分钟。</p>
+          </button>
+        </div>
+      )}
       <div className="practice-grid">
         {visible.map((item) => (
-          <button className="practice-card" key={item.title} onClick={() => onStart(item.title)}>
+          <button
+            className="practice-card"
+            key={item.title}
+            onClick={() => onStart(item.modeKey, item.levelIdx)}
+          >
             <span className="stage-icon" style={{ color: item.color, background: `${item.color}18` }}>
               <Icon name={item.icon} />
             </span>

@@ -37,6 +37,14 @@ function tagFor(key: string, mode: EngineMode): string {
   return `${categoryOf(key)} · ${mode.stage}`;
 }
 
+// 优先定位到第一个未过关的档位，全部过关就停在最后一档——和 getHomeData() 里 `next` 的选择逻辑保持一致。
+function nextLevelIdx(mode: EngineMode): number {
+  const levels = mode.levels || [];
+  if (!levels.length) return 0;
+  const idx = levels.findIndex((lv) => !levelStat(lv.id).passed);
+  return idx === -1 ? levels.length - 1 : idx;
+}
+
 export function getPracticeItems(): PracticeItem[] {
   return allModeKeys()
     .filter((key) => MODES[key])
@@ -49,6 +57,8 @@ export function getPracticeItems(): PracticeItem[] {
         progress: modeProgressPct(mode),
         color: colorOf(key),
         icon: iconOf(key),
+        modeKey: key,
+        levelIdx: nextLevelIdx(mode),
       };
     });
 }
@@ -94,6 +104,8 @@ export function getHomeData(): HomeData {
           progress: Math.round((recent20Rate(levelStat(next.id)) ?? 0) * 100),
           color: colorOf(key),
           icon: iconOf(key),
+          modeKey: key,
+          levelIdx: nextLevelIdx(mode),
         };
       }
       return null;
