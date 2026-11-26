@@ -23,6 +23,7 @@ export function SourcesScreen({ onBack, onGoAuth }: { onBack: () => void; onGoAu
   const [role, setRole] = useState("any");
   const [rootMidi, setRootMidi] = useState(40);
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!API.user) {
@@ -44,6 +45,7 @@ export function SourcesScreen({ onBack, onGoAuth }: { onBack: () => void; onGoAu
   const allNames = [...new Set(Samples.list.map((s) => s.name))];
 
   async function upload() {
+    if (busy) return;
     const files = fileRef.current?.files ? [...fileRef.current.files] : [];
     if (!name) {
       setMsg("先给音源起个名字");
@@ -63,26 +65,31 @@ export function SourcesScreen({ onBack, onGoAuth }: { onBack: () => void; onGoAu
       }
       jobs.push({ f, midi });
     }
+    setBusy(true);
     let done = 0;
     let fail = "";
-    for (const j of jobs) {
-      setMsg("上传中 " + (done + 1) + "/" + jobs.length + "：" + j.f.name);
-      const fd = new FormData();
-      fd.append("name", name);
-      fd.append("role", role);
-      fd.append("rootMidi", String(j.midi));
-      fd.append("file", j.f);
-      const r = await API.uploadSample(fd);
-      if (r.ok) done++;
-      else {
-        fail = r.error || "上传失败";
-        break;
+    try {
+      for (const j of jobs) {
+        setMsg("上传中 " + (done + 1) + "/" + jobs.length + "：" + j.f.name);
+        const fd = new FormData();
+        fd.append("name", name);
+        fd.append("role", role);
+        fd.append("rootMidi", String(j.midi));
+        fd.append("file", j.f);
+        const r = await API.uploadSample(fd);
+        if (r.ok) done++;
+        else {
+          fail = r.error || "上传失败";
+          break;
+        }
       }
+      const ls = await API.listSamples();
+      if (ls.samples) Samples.setList(ls.samples);
+      setMsg(fail ? "已上传 " + done + "/" + jobs.length + "，中断于：" + fail : "已上传 " + done + " 个采样到「" + name + "」");
+      bump((n) => n + 1);
+    } finally {
+      setBusy(false);
     }
-    const ls = await API.listSamples();
-    if (ls.samples) Samples.setList(ls.samples);
-    setMsg(fail ? "已上传 " + done + "/" + jobs.length + "，中断于：" + fail : "已上传 " + done + " 个采样到「" + name + "」");
-    bump((n) => n + 1);
   }
 
   async function preview(s: SampleEntry) {
@@ -150,8 +157,10 @@ export function SourcesScreen({ onBack, onGoAuth }: { onBack: () => void; onGoAu
           </label>
         </div>
         <div className="row" style={{ marginTop: 10, gap: 10 }}>
-          <input type="file" ref={fileRef} accept="audio/*" multiple aria-label="选择音频文件" style={{ flex: 1 }} />
-          <button onClick={upload}>上传</button>
+          <input type="file" ref={fileRef} accept="audio/*" multiple aria-label="选择音频文件" style={{ flex: 1 }} disabled={busy} />
+          <button onClick={upload} disabled={busy}>
+            上传
+          </button>
         </div>
         {msg && (
           <div className="small" role="status" aria-live="polite" style={{ marginTop: 8, color: "var(--accent)" }}>

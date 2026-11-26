@@ -11,7 +11,7 @@
     "dev": "concurrently -n server,client -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "npm run typecheck && vite build",
-    "test": "node tests/e2e.mjs"
+    "test": "NODE_ENV=development vite build && node tests/e2e.mjs"
   },
   "engines": {
     "node": ">=18"
