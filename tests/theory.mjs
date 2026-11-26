@@ -13,8 +13,10 @@ globalThis.document = { getElementById: () => null, addEventListener: () => {}, 
 
 const {
   thScale, thP, thNotesText, thChordNotes, thIvBetween, TH_MODES, TH_DIA, thDiaChord,
-  TH_KEYS, TH_KEY_BY, thDegChord, thNm, thFormula, thChordFormula,
+  TH_KEYS, TH_KEY_BY, thDegChord, thNm, thPc, thFormula, thChordFormula,
   MODES, S, TH_MODE_KEYS, TH_LESSONS, thGenQuestion, thRenderLesson, thMarkRead,
+  TH_CH, TH_ROOTS12, FRET_MAX, cellsIn, fretTuning,
+  thChordToolTones, thChordToolMarks, THCT_GROUPS,
 } = await import("../client/src/engine/index.js");
 
 let fails = 0;
@@ -121,6 +123,60 @@ for (const mk of TH_MODE_KEYS) {
   }
 }
 console.log("讲解内容冒烟：" + lessonCount + " 课全部渲染并标记已读");
+
+/* ---------- 4. 和弦工具：级数 + 字母音名 + 整条指板的位置 ---------- */
+{
+  const tun = fretTuning();
+  const checkChord = (rootName, q) => {
+    const root = thP(rootName);
+    const tones = thChordToolTones(root, q);
+    const formula = TH_CH[q].f;
+    check(tones.length === formula.length, `${rootName}${q} 音数应等于公式音数`);
+    tones.forEach((t, i) => {
+      const [num, semi] = formula[i];
+      check(t.num === num && t.semi === semi, `${rootName}${q} 第 ${i} 个音的级数/半音应和公式一致`);
+      check(typeof t.lab === "string" && t.lab.length > 0, `${rootName}${q} 第 ${i} 个音应有级数标签`);
+      check(typeof t.name === "string" && /^[A-G]/.test(t.name), `${rootName}${q} 第 ${i} 个音应有字母音名`);
+    });
+
+    const { marks } = thChordToolMarks(root, q);
+    const pcs = tones.map(t => (thPc(root) + t.semi) % 12);
+    const expectCells = cellsIn(tun, 0, FRET_MAX, pc => pcs.includes(pc));
+    check(Object.keys(marks).length === expectCells.length,
+      `${rootName}${q} 全指板标记数应等于该和弦音在整条指板出现的次数：got ${Object.keys(marks).length} want ${expectCells.length}`);
+    for (const c of expectCells) {
+      const key = c.s + "-" + c.f;
+      const mk = marks[key];
+      check(!!mk, `${rootName}${q} 位置 ${key} 应该有标记`);
+      if (mk) {
+        const t = tones.find(t => (thPc(root) + t.semi) % 12 === c.midi % 12);
+        check(mk.label === t.lab, `${rootName}${q} 位置 ${key} 的级数标签应为 ${t.lab}，实际 ${mk.label}`);
+      }
+    }
+    // 边界品位（第 0 品和第 FRET_MAX 品）如果本来就该有音，不能被漏掉
+    const edgeCells = expectCells.filter(c => c.f === 0 || c.f === FRET_MAX);
+    for (const c of edgeCells) check(!!marks[c.s + "-" + c.f], `${rootName}${q} 边界品位 ${c.s}-${c.f} 不应被漏掉`);
+  };
+  checkChord("C", "dom7");
+  checkChord("F♯", "min7");
+  checkChord("B♭", "maj9");
+
+  // 所有 12 个根音 × 已注册的每种和弦质量都不应该抛错、且至少有一个标记位置
+  for (const root of TH_ROOTS12) {
+    for (const q of Object.keys(TH_CH)) {
+      let marks;
+      try { ({ marks } = thChordToolMarks(root, q)); } catch (e) { check(false, `${thNm(root)}${q} 生成指板标记报错：${e.message}`); continue; }
+      check(Object.keys(marks).length > 0, `${thNm(root)}${q} 应该至少有一个指板位置`);
+    }
+  }
+  // 分组清单不能漏掉或多出和弦质量，否则选择器里会少一种或多一个不存在的 key
+  const grouped = THCT_GROUPS.flatMap(g => g.keys);
+  check(grouped.length === Object.keys(TH_CH).length, "和弦质量分组数量应等于 TH_CH 里登记的种类数：got " + grouped.length + " want " + Object.keys(TH_CH).length);
+  check(new Set(grouped).size === grouped.length, "和弦质量分组不应有重复");
+  for (const k of grouped) check(!!TH_CH[k], "分组里的 " + k + " 应该是已注册的和弦质量");
+
+  console.log("和弦工具：" + (fails ? "有失败项" : "级数/音名/指板全部通过"));
+}
 
 console.log(fails ? `\n✕ ${fails} 项失败` : "\n✓ 乐理课测试全部通过");
 process.exit(fails ? 1 : 0);

@@ -101,6 +101,27 @@ h1 span { color: var(--accent); }
 .session-sheet { width: min(100%, 520px); position: relative; padding: 34px 24px 24px; background: #161d2b; border: 1px solid rgba(255,255,255,.12); border-radius: 25px; box-shadow: 0 30px 80px #000; animation: slideUp .3s ease; }.close-btn { position: absolute; top: 15px; right: 15px; width: 34px; height: 34px; display: grid; place-items: center; color: #8f99aa; border: 0; border-radius: 50%; background: #222b3b; }.session-art { width: 62px; height: 62px; display: grid; place-items: center; color: #ff9071; background: rgba(255,117,87,.1); border-radius: 18px; margin-bottom: 24px; }.session-sheet h2 { margin: 0 0 11px; font-size: 25px; }.sheet-desc { color: var(--muted); font-size: 12px; line-height: 1.7; }.session-meta { display: flex; flex-wrap: wrap; gap: 7px; margin: 20px 0; }.session-meta span { display: flex; align-items: center; gap: 5px; padding: 7px 10px; color: #adb5c3; background: #202838; border-radius: 8px; font-size: 10px; }.primary-btn.full { width: 100%; justify-content: center; margin-top: 5px; }.ready-state { text-align: center; padding-top: 18px; }.ready-check { width: 72px; height: 72px; display: grid; place-items: center; margin: 0 auto 24px; color: #111820; background: #5ed1a5; border-radius: 50%; }.ready-state p:not(.eyebrow) { color: var(--muted); font-size: 12px; margin-bottom: 25px; }
 @keyframes fadeIn { from { opacity: 0 } } @keyframes slideUp { from { transform: translateY(30px); opacity: 0 } }
 
+/* 和弦工具浮窗：悬浮按钮常驻，z-index 低于弹层(60)、高于底部导航(30)/侧栏(40)，
+   touch-action:none 让 pointerdown 后的拖动不被浏览器当成页面滚动手势抢走。 */
+.chord-tool-fab { position: fixed; z-index: 45; width: 52px; height: 52px; display: grid; place-items: center; border: 0; border-radius: 50%; color: #1a1313; background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: 0 10px 26px rgba(255, 117, 87, .4); touch-action: none; }
+.chord-tool-backdrop { position: fixed; z-index: 55; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 14px; background: rgba(3, 5, 9, .45); backdrop-filter: blur(4px); animation: fadeIn .15s ease; }
+.chord-tool-panel { width: min(100%, 420px); max-height: min(78vh, 640px); overflow-y: auto; position: relative; padding: 20px 18px calc(18px + env(safe-area-inset-bottom)); background: var(--surface-2); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 30px 80px #000; animation: slideUp .2s ease; }
+.chord-tool-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-weight: 700; }
+.chord-tool-head .close-btn { position: static; }
+.chord-tool-roots, .chord-tool-qlist { display: flex; flex-wrap: wrap; gap: 6px; }
+.chord-tool-qgroup { margin-top: 12px; }
+.chord-tool-glabel { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; letter-spacing: .06em; }
+.chord-tool-chip { padding: 6px 11px; border: 1px solid var(--line); border-radius: 10px; color: #c8ccd6; background: var(--surface); font-size: 12px; }
+.chord-tool-chip.active { color: #1a1313; border-color: transparent; background: var(--accent); font-weight: 700; }
+.chord-tool-notes { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 6px; }
+.chord-tool-note { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 46px; padding: 8px 10px; border-radius: 10px; background: var(--surface); font-size: 11px; color: #dfe3eb; }
+.chord-tool-note b { font-size: 13px; color: var(--accent-2); }
+.chord-tool-fretboard { margin-top: 10px; }
+
+@media (min-width: 600px) {
+  .chord-tool-backdrop { align-items: center; }
+}
+
 @media (min-width: 600px) {
   main { padding: 46px 34px 110px; }
   .hero-card { min-height: 370px; }.hero-copy { width: 58%; padding: 40px; }.hero-visual { right: -80px; width: 62%; }

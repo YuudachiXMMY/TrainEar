@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { NavItem } from "./components/NavItem";
 import { SessionSheet, type SessionInfo } from "./components/SessionSheet";
+import { ChordToolWidget } from "./components/ChordToolWidget";
 import { HomeView } from "./views/HomeView";
 import { PracticeView } from "./views/PracticeView";
 import { LessonsView } from "./views/LessonsView";
@@ -196,6 +197,8 @@ export default function App() {
         </nav>
       )}
       {session && <SessionSheet session={session} onClose={closeSessionSheet} onConfirm={confirmSession} />}
+      {/* 答题/热身中隐藏，避免误触打断练习；其余页面（首页/课程/个人中心/讲解页）常驻可点 */}
+      <ChordToolWidget hidden={overlay === "quiz" || overlay === "warmup"} />
     </div>
   );
 }

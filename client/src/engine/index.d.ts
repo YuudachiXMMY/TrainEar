@@ -230,3 +230,50 @@ export function noteNameOct(midi: number): string;
 export const KEYS: { name: string; pc: number }[];
 export const WARMUP_PATTERNS: { name: string; degs: number[]; why: string }[];
 export const MAJOR_SCALE: number[];
+
+/* ---------------- 拼写音（th-engine.js，thP/thUp 等返回的音对象） ---------------- */
+export interface SpelledNote {
+  L: number;
+  acc: number;
+}
+export function thNm(n: SpelledNote): string;
+
+/* ---------------- 和弦（th-engine.js / th-chords.js / th-chordtool.js） ---------------- */
+export interface ChordQuality {
+  sym: string;
+  zh: string;
+  f: [number, number][];
+  feel?: string;
+}
+export const TH_CH: Record<string, ChordQuality>;
+export const TH_ROOTS12: SpelledNote[];
+
+/* ---------------- 指板（fret.js，和弦工具只读展示用） ---------------- */
+export interface FretMark {
+  cls: string;
+  label?: string;
+}
+export function fretboardHtml(o: {
+  tun: number[];
+  marks?: Record<string, FretMark>;
+  wide?: boolean;
+  from?: number;
+  to?: number;
+  enabled?: (s: number, f: number) => boolean;
+  [key: string]: unknown;
+}): string;
+
+/* ---------------- 和弦工具（th-chordtool.js）：查级数/音名/整条指板的位置，不出题不计分 ---------------- */
+export interface ChordToolTone {
+  num: number;
+  semi: number;
+  lab: string;
+  name: string;
+}
+export function thChordToolTones(root: SpelledNote, q: string): ChordToolTone[];
+export function thChordToolMarks(
+  root: SpelledNote,
+  q: string,
+  opt?: { tun?: number[] }
+): { tun: number[]; tones: ChordToolTone[]; marks: Record<string, FretMark> };
+export const THCT_GROUPS: { label: string; keys: string[] }[];
