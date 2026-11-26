@@ -38,10 +38,14 @@ const spell = {
   sigs: TH_KEYS.map(k => { const sc2 = thScale(k.t); const n = sc2.reduce((a, x) => a + x.acc, 0); return n === k.sig ? null : k.n; }).filter(Boolean),
   form: TH_MODES.map(m => thFormula(m.semis)),
   chordForm: ["dim7", "m7b5", "aug"].map(thChordFormula),
+  ext: ["maj6", "min6", "mMaj7", "dom7sus4", "add9", "dom9", "maj9", "min9"].map(q => ch("C", q)).join(" | "),
+  extForm: ["maj6", "dom7sus4", "dom9", "mMaj7"].map(thChordFormula).join(" | "),
 };
 const expect = {
   Fs: "F♯ G♯ A♯ B C♯ D♯ E♯", Db: "D♭ E♭ F G♭ A♭ B♭ C", B: "B C♯ D♯ E F♯ G♯ A♯", Eb: "E♭ F G A♭ B♭ C D",
   Cdim7: "C E♭ G♭ B♭♭", Fsm7b5: "F♯ A C E", Bb7: "B♭ D F A♭", Eaug: "E G♯ B♯", Abmaj7: "A♭ C E♭ G", Csus4: "C F G",
+  ext: "C E G A | C E♭ G A | C E♭ G B | C F G B♭ | C E G D | C E G B♭ D | C E G B D | C E♭ G B♭ D",
+  extForm: "1 3 5 6 | 1 4 5 ♭7 | 1 3 5 ♭7 9 | 1 ♭3 5 7",
   iv1: "m3", iv2: "A4", iv3: "d5", iv4: "m6", iv5: "M7", iv6: "m7",
   dDor: "D E F G A B C", ePhr: "E F G A B C D",
   dia: "E♭ Fm Gm A♭ B♭ Cm Ddim", dia7: "Amaj7 Bm7 C♯m7 Dmaj7 E7 F♯m7 G♯m7♭5",
@@ -68,6 +72,7 @@ for (const mk of TH_MODE_KEYS) {
       sigs.add(q.sig);
       if (q.fret) {
         if (!q.targets || !q.targets.length) bad.push("指板题没有目标");
+        if (q.steps && q.steps.some(s => !s.cells.length)) bad.push("多步指板题有一步没有位置 " + q.prompt);
         continue;
       }
       const labels = q.options.map(o => o.label), values = q.options.map(o => o.value);
