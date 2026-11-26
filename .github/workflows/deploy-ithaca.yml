@@ -23,7 +23,9 @@ jobs:
         run: npm ci
       - name: Syntax check
         run: |
-          for f in server/*.js public/js/*.js; do node --check "$f"; done
+          for f in server/*.js; do node --check "$f"; done
+      - name: Typecheck
+        run: npm run typecheck
       - name: Boot smoke test (/api/health)
         run: |
           DATA_DIR=/tmp/ci-data PORT=8321 node server/index.js &
