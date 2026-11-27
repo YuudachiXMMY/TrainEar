@@ -18,3 +18,4 @@ import "./th-harmony.js";
 import "./th-advanced.js";
 import "./th-bassline.js";
 import "./th-chords.js";
+export * from "./th-chordtool.js";
